@@ -1,0 +1,2470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LingOrm 刷推文案生成器</title>
+<meta name="theme-color" content="#a855f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="LingOrm刷推">
+<meta name="app-ver" content="86">
+<script>
+// ---------- 入口纠偏（必须放 <head>，在首次绘制前执行）----------
+// 平台网关把根路径 / 固化缓存成旧版本（v45，主题里是 Calvin Klein SS27），
+// 只有带查询参数的请求才会绕开它。这里抢在渲染之前把入口从 / 迁到
+// /index.html?_r=<时间戳>，用户就不会先看到旧版再跳。
+(function () {
+  try {
+    var p = location.pathname;
+    if (p === '/' || p === '' || /\/$/.test(p)) {
+      var q = location.search.replace(/^\?/, '')
+        .replace(/(^|&)_r=\d+/g, '').replace(/(^|&)chk=\d+/g, '')
+        .replace(/^&+|&+$/g, '');
+      location.replace('index.html' + (q ? '?' + q + '&' : '?') + '_r=' + Date.now());
+    }
+  } catch (e) {}
+})();
+</script>
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", -apple-system, sans-serif;
+    background: linear-gradient(135deg, #fdf2f8 0%, #f3e8ff 50%, #eff6ff 100%);
+    min-height: 100vh;
+    color: #3d2b3f;
+    padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  .card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 24px rgba(180, 120, 200, 0.12);
+    margin-bottom: 16px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 26px;
+    background: linear-gradient(90deg, #ec4899, #a855f7, #6366f1);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 6px;
+  }
+  .sub {
+    text-align: center;
+    color: #9a7fa8;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #7c5a8f;
+    margin: 14px 0 8px;
+  }
+  .opts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .opt-btn {
+    flex: 1;
+    min-width: 100px;
+    padding: 10px 12px;
+    border: 1.5px solid #e9d5e9;
+    border-radius: 10px;
+    background: #faf5fb;
+    color: #6b4f78;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all .18s;
+    text-align: center;
+  }
+  .opt-btn:hover { border-color: #d8a7d8; }
+  .opt-btn.active {
+    background: linear-gradient(90deg, #ec4899, #a855f7);
+    color: #fff;
+    border-color: transparent;
+    font-weight: 600;
+  }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  input[type="text"] {
+    flex: 1;
+    min-width: 220px;
+    padding: 10px 14px;
+    border: 1.5px solid #e9d5e9;
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+    background: #faf5fb;
+    color: #3d2b3f;
+  }
+  input[type="text"]:focus { border-color: #d8a7d8; }
+  .gen-btn {
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 12px;
+    background: linear-gradient(90deg, #ec4899, #a855f7, #6366f1);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 18px;
+    transition: transform .15s, box-shadow .15s;
+    box-shadow: 0 4px 16px rgba(200, 100, 220, 0.3);
+  }
+  .gen-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 22px rgba(200, 100, 220, 0.4); }
+  .gen-btn:active { transform: translateY(0); }
+  .out-card {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px;
+    border: 1px solid #f0e0f2;
+    box-shadow: 0 2px 10px rgba(180, 120, 200, 0.08);
+    margin-bottom: 12px;
+    animation: pop .25s ease;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .out-text {
+    font-size: 15px;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #2d1f30;
+    font-family: "Segoe UI", Georgia, serif;
+    user-select: text;
+    -webkit-user-select: text;
+    cursor: text;
+  }
+  .out-text .kw-line { color: #a855f7; font-size: 14px; }
+  .card-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .mini-btn {
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1.5px solid #e9d5e9;
+    background: #faf5fb;
+    color: #7c5a8f;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .mini-btn:hover { background: #f3e3f6; border-color: #d8a7d8; }
+  .mini-btn.done { background: #dcfce7; border-color: #86efac; color: #15803d; }
+  .kw-panel {
+    background: #faf5fb;
+    border: 1.5px dashed #d8a7d8;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13.5px;
+    line-height: 1.9;
+    color: #7c5a8f;
+    word-break: break-word;
+  }
+  .kw-panel .kw-row { display: flex; align-items: baseline; gap: 8px; }
+  .kw-panel .kw-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #a855f7;
+    flex-shrink: 0;
+  }
+  .kw-panel .kw-val { color: #553c60; white-space: pre-line; }
+  .kw-panel .lock {
+    text-align: right;
+    font-size: 11px;
+    color: #b08fc0;
+    margin-top: 4px;
+  }
+  .date-banner {
+    text-align: center;
+    font-size: 12px;
+    color: #b08fc0;
+    padding: 6px;
+    letter-spacing: 1px;
+  }
+  .empty {
+    text-align: center;
+    color: #c4a8cf;
+    font-size: 14px;
+    padding: 30px 0 10px;
+  }
+  .tip {
+    font-size: 12px;
+    color: #a58ab5;
+    margin-top: 8px;
+    line-height: 1.6;
+  }
+  /* 添加到主屏幕按钮 */
+  #installBtn {
+    display: none;
+    margin: 4px auto 16px;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ec4899, #a855f7);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(168, 85, 247, 0.35);
+    font-family: inherit;
+    transition: transform .15s, box-shadow .15s;
+  }
+  #installBtn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(168, 85, 247, 0.45); }
+  /* iOS 引导弹窗 */
+  .ios-mask {
+    position: fixed; inset: 0;
+    background: rgba(30, 20, 40, 0.55);
+    z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .ios-card {
+    width: 100%; max-width: 340px;
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px 22px;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0,0,0,.25);
+  }
+  .ios-card h3 { font-size: 17px; color: #3d2b3f; margin-bottom: 14px; }
+  .ios-step {
+    display: flex; align-items: center; gap: 10px;
+    text-align: left; font-size: 14px; color: #6b4f78;
+    padding: 9px 4px; line-height: 1.5;
+  }
+  .ios-step .num {
+    flex: none; width: 22px; height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(90deg, #ec4899, #a855f7);
+    color: #fff; font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ios-step .share-ico {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 6px;
+    background: #f0ecf5; margin: 0 2px; vertical-align: middle;
+  }
+  .ios-close {
+    margin-top: 16px;
+    padding: 10px 0; width: 100%;
+    border: none; border-radius: 10px;
+    background: linear-gradient(90deg, #ec4899, #a855f7);
+    color: #fff; font-size: 15px; font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* ---------- 模式切换入口（LingOrm 通用 ⇄ Dior 时尚专用） ---------- */
+  .mode-bar { margin-bottom: 14px; }
+  .mode-btn {
+    width: 100%;
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 16px;
+    border: 1.5px solid #e6d3b3;
+    border-radius: 14px;
+    background: linear-gradient(90deg, #fffdf8, #faf3e6);
+    color: #6b5327;
+    font-size: 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: all .18s;
+    box-shadow: 0 2px 12px rgba(176, 141, 87, 0.12);
+  }
+  .mode-btn:hover { border-color: #c9a961; transform: translateY(-1px); }
+  .mode-btn:active { transform: translateY(0); }
+  .mode-btn .mode-ico { flex: none; font-size: 20px; line-height: 1; }
+  .mode-btn .mode-txt { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .mode-btn .mode-t1 { font-weight: 700; font-size: 15px; color: #4a3a1c; }
+  .mode-btn .mode-t2 { font-size: 12px; color: #9c8557; }
+  .mode-btn .mode-arrow { flex: none; font-size: 16px; color: #b08d57; }
+
+  /* Dior 专用模式：整页换成黑金视觉 */
+  .wrap.dior-mode h1 {
+    background: linear-gradient(90deg, #b08d57, #e0c07a, #8a6a3b);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .wrap.dior-mode .sub { color: #9c8557; }
+  .wrap.dior-mode .card { box-shadow: 0 4px 24px rgba(176, 141, 87, 0.16); }
+  .wrap.dior-mode .section-label { color: #8a6a3b; }
+  .wrap.dior-mode .mode-btn {
+    background: linear-gradient(90deg, #1c1a17, #2e2a24);
+    border-color: #b08d57;
+  }
+  .wrap.dior-mode .mode-btn .mode-t1 { color: #f0e2c0; }
+  .wrap.dior-mode .mode-btn .mode-t2 { color: #b9a271; }
+  .wrap.dior-mode .mode-btn .mode-arrow { color: #e0c07a; }
+  .wrap.dior-mode .opt-btn { border-color: #e6d3b3; background: #fffdf8; color: #6b5327; }
+  .wrap.dior-mode .opt-btn:hover { border-color: #c9a961; }
+  .wrap.dior-mode .opt-btn.active {
+    background: linear-gradient(90deg, #2e2a24, #b08d57);
+    color: #fff; border-color: transparent;
+  }
+  .wrap.dior-mode .gen-btn {
+    background: linear-gradient(90deg, #1c1a17, #4a3f2c, #b08d57);
+    box-shadow: 0 4px 16px rgba(140, 110, 60, 0.32);
+  }
+  .wrap.dior-mode .out-card { border-color: #efe3cc; }
+  .wrap.dior-mode .kw-panel .lock { color: #9c8557; }
+  /* Dior 模式：主题选择区隐藏（主题恒为 Dior），改为显示说明条 */
+  .wrap.dior-mode .theme-section { display: none; }
+  .mode-note {
+    display: none;
+    margin: 14px 0 4px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    background: #fdf8ee;
+    border: 1px dashed #ddc79a;
+    color: #8a6a3b;
+    font-size: 12.5px;
+    line-height: 1.65;
+  }
+  .wrap.dior-mode .mode-note { display: block; }
+
+  /* ---------- Dior 模式下的平台模块：X 推文 / IG 文案 ---------- */
+  .plat-tabs {
+    display: none;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 4px;
+    background: #f7f3ea;
+    border: 1px solid #e6d3b3;
+    border-radius: 12px;
+  }
+  .wrap.dior-mode .plat-tabs { display: flex; }
+  .plat-tab {
+    flex: 1;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: #8a6a3b;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all .18s;
+  }
+  .plat-tab:hover { background: #f0e7d4; }
+  .plat-tab.active {
+    background: linear-gradient(90deg, #1c1a17, #4a3f2c);
+    color: #f0e2c0;
+    box-shadow: 0 2px 10px rgba(28, 26, 23, 0.22);
+  }
+
+  /* 视图显隐：IG 视图默认隐藏，仅「Dior 模式 + IG 模块」时显示 */
+  .view-ig { display: none; }
+  .wrap.dior-mode.pf-ig .view-ig { display: block; }
+  .wrap.dior-mode.pf-ig .view-x { display: none; }
+
+  /* ---------- IG 文案面板（沿用 dior-ig-caption-generator 的黑金视觉） ---------- */
+  .ig-panel {
+    background: #0d0d0d;
+    border: 1px solid #2c2c2c;
+    border-radius: 14px;
+    padding: 24px 20px;
+    color: #f5f0e8;
+  }
+  .ig-title {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-align: center;
+    color: #f5f0e8;
+    margin-bottom: 4px;
+  }
+  .ig-sub {
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #b8a06a;
+    margin-bottom: 20px;
+  }
+  .ig-controls { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .ig-panel select, .ig-panel .ig-btn {
+    font-family: inherit;
+    font-size: 13px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .ig-panel select {
+    flex: 1;
+    min-width: 140px;
+    background: #1f1f1f;
+    color: #f5f0e8;
+    border: 1px solid #333;
+    padding: 10px 12px;
+  }
+  .ig-btn {
+    background: #f5f0e8;
+    color: #111;
+    border: none;
+    padding: 10px 18px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    transition: all .15s;
+  }
+  .ig-btn:hover { background: #d4b96a; }
+  .ig-btn.ghost {
+    background: transparent;
+    color: #b8a06a;
+    border: 1px solid #b8a06a;
+    font-weight: 400;
+  }
+  .ig-btn.ghost:hover { background: rgba(184, 160, 106, .15); }
+  .ig-panel textarea {
+    width: 100%;
+    height: 240px;
+    background: #1c1c1c;
+    border: 1px solid #333;
+    border-radius: 10px;
+    color: #eee;
+    font-size: 14px;
+    line-height: 1.7;
+    padding: 14px;
+    resize: vertical;
+    font-family: inherit;
+  }
+  .ig-panel textarea:focus { outline: none; border-color: #b8a06a; }
+  .ig-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #888;
+  }
+  .ig-meta .warn { color: #d46a6a; }
+  .ig-hint {
+    margin-top: 18px;
+    font-size: 12px;
+    color: #777;
+    line-height: 1.8;
+    border-top: 1px solid #262626;
+    padding-top: 14px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <h1 id="appTitle">✨ LingOrm 刷推文案生成器</h1>
+  <div class="sub" id="appSub">夸赞 Ling &amp; Orm 的美貌、演技或时尚 · 英文短句 + 当日关键字 + 标签</div>
+  <div class="date-banner" id="dateBanner"></div>
+
+  <div class="mode-bar">
+    <button class="mode-btn" id="modeBtn" type="button">
+      <span class="mode-ico" id="modeIco">🎩</span>
+      <span class="mode-txt">
+        <span class="mode-t1" id="modeTitle">切换为 Dior 时尚文案生成器</span>
+        <span class="mode-t2" id="modeHint">Dior 专用模式 · 时尚正式文风</span>
+      </span>
+      <span class="mode-arrow" id="modeArrow">→</span>
+    </button>
+  </div>
+
+  <div class="card">
+    <!-- 平台模块切换：仅在 Dior 时尚专用模式下显示（CSS 控制） -->
+    <div class="plat-tabs" id="platTabs">
+      <button class="plat-tab active" id="platX" data-p="x" type="button">🐦 X 推文</button>
+      <button class="plat-tab" id="platIG" data-p="ig" type="button">📷 IG 文案</button>
+    </div>
+
+    <div class="view-x">
+    <div class="section-label">主角选择</div>
+    <div class="opts" id="targetOpts">
+      <button class="opt-btn active" data-v="cp">LingOrm CP</button>
+      <button class="opt-btn" data-v="ling">Ling (Lingling Kwong)</button>
+      <button class="opt-btn" data-v="orm">Orm (Orm Kornnaphat)</button>
+    </div>
+
+    <div class="theme-section">
+      <div class="section-label">文案主题</div>
+      <div class="opts" id="themeOpts">
+        <button class="opt-btn active" data-v="random">随机混搭</button>
+        <button class="opt-btn" data-v="beauty">美貌夸夸</button>
+        <button class="opt-btn" data-v="acting">演技夸夸</button>
+        <button class="opt-btn" data-v="ck">Calvin Klein</button>
+        <button class="opt-btn" data-v="dior">Dior</button>
+      </div>
+    </div>
+
+    <div class="mode-note" id="modeNote">
+      🖤 <b>Dior 时尚专用模式</b>：主题固定为 Dior（时尚正式文风、完整姓名、不用负面表情），
+      主角仍可选 CP / Ling / Orm。点击顶部按钮可返回通用模式。
+    </div>
+
+    <div class="section-label">生成数量</div>
+    <div class="opts" id="countOpts">
+      <button class="opt-btn" data-v="1">1 条</button>
+      <button class="opt-btn active" data-v="3">3 条</button>
+      <button class="opt-btn" data-v="5">5 条</button>
+    </div>
+
+    <div class="section-label">当日关键字 / 标签分组（后台配置，前台只读，仅显示当前时间段内的分组）</div>
+    <div class="opts" id="groupOpts"></div>
+    <div class="kw-panel" id="kwPanel"></div>
+
+    <button class="gen-btn" id="genBtn" onclick="generate()">🌟 生成刷推文案</button>
+    <div class="tip">先在上方选择当日分组（仅显示当前时间段内有效的分组），再生成。每条文案可「📋 复制整条」手动粘贴，或点「🐦 一键发推」直接跳转 X 发推框（文案已预填，点一下发送即可）。格式：英文夸夸短句 → 空一行 → 当日关键字（一行）→ 当日标签（每个标签单独一行）；整条推文总字符控制在 220 以内，发推框内可再微调。每位访客拥有专属文案序列（见顶部序列号），全站用户之间互不重复。分组与时间窗由后台 config.js 统一控制，前台不可更改。</div>
+    </div><!-- /view-x -->
+
+    <div class="view-ig">
+      <div class="ig-panel">
+        <h2 class="ig-title">Dior · IG Caption</h2>
+        <div class="ig-sub">时尚正向文案一键生成</div>
+
+        <div class="ig-controls">
+          <select id="igMode" onchange="igOnModeChange()">
+            <option value="caption">用途：帖子文案</option>
+            <option value="comment">用途：IG 评论</option>
+            <option value="story">用途：Story 标签</option>
+          </select>
+          <select id="igTarget" onchange="igGenerate()" style="display:none">
+            <option value="cp">评论主角：双人（Lingling Kwong &amp; Orm Kornnaphat）</option>
+            <option value="ling">评论主角：单人 Lingling Kwong</option>
+            <option value="orm">评论主角：单人 Orm Kornnaphat</option>
+          </select>
+          <select id="igTone">
+            <option value="any">风格：随机</option>
+            <option value="runway">秀场氛围 / PFW</option>
+            <option value="golden">品牌质感 / Golden Glow</option>
+            <option value="soft">浪漫柔和 / Soft &amp; Dreamy</option>
+            <option value="bold">自信力量 / Bold Elegance</option>
+          </select>
+          <button class="ig-btn" id="igGenBtn" type="button" onclick="igGenerate()">✨ 生成文案</button>
+          <button class="ig-btn ghost" id="igCopyBtn" type="button">复制</button>
+        </div>
+
+        <textarea id="igOut" spellcheck="false"></textarea>
+
+        <div class="ig-meta">
+          <span id="igCount">0 字符</span>
+          <span id="igLimit"></span>
+        </div>
+
+        <div class="ig-hint">
+          帖子文案：正文自动包含两位全名 Lingling Kwong 与 Orm Kornnaphat，并附带标签行（前空一行）：#LinglingKwong #OrmKornnaphat #Dior #DiorSummer27 #PFW<br>
+          并 @linglingkwong @orm.kornnaphat @dior · 发帖前可手动微调，@ 与标签均可保留在文末。<br>
+          评论模式：用途选「IG 评论」后，评论主角可切双人或单人 —— 双人时<strong>两人全名都出现</strong>，单人时<strong>只出现该主角全名</strong>（不出现另一位、也不出现短称呼）；正文为 1~2 句时尚正向短评，<strong>每条必含 Dior / DiorSummer27</strong>（品牌露出），<strong>只有正文、不带标签与 @</strong>，可直接粘到评论区。<br>
+          Story 模式：生成适合贴在 Stories 上的标签排布（可贴小号文字或缩小藏于贴纸后），随机切换单行 / 分行 / 竖排三种排版，并附 @Dior @jonathan.anderson @utzpeter @linglingkwong @orm.kornnaphat。
+        </div>
+      </div>
+    </div><!-- /view-ig -->
+  </div>
+
+  <div id="output" class="view-x"></div>
+</div>
+
+<!-- ⚠️ 版本号必须带在 src 上（?v=N）：config.js 走普通 <script> 加载，
+     平台静态服务不返回 Cache-Control，浏览器会按启发式缓存把它长期钉在旧副本，
+     于是「后台改了配置、线上也推成功了，但访客设备上看不到新分组」。
+     带上 ?v=<app-ver> 后每次升版都是一个全新 URL，一定回源取到最新配置。 -->
+<script src="config.js?v=86"></script>
+<script>
+const state = { target: "cp", theme: "random", count: 3, mode: "lingorm", prevTheme: null, platform: "x" };
+
+function bindOpts(id, key) {
+  const box = document.getElementById(id);
+  box.querySelectorAll(".opt-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      box.querySelectorAll(".opt-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      state[key] = id === "countOpts" ? Number(btn.dataset.v) : btn.dataset.v;
+    });
+  });
+}
+bindOpts("targetOpts", "target");
+bindOpts("themeOpts", "theme");
+bindOpts("countOpts", "count");
+
+// 主题-主角自动关联：
+//   CK 主题（Calvin Klein）  → 主角锁定 Ling (Lingling Kwong)
+//   Dior 主题               → 不锁定，CP / Ling / Orm 均可手动选择
+// 锁定生效时，选中主题后立即强制并更新按钮高亮；锁定期间点击其他主角按钮
+// （或分组自动匹配写入）都会被拉回锁定值。未锁定的主题完全尊重手动选择。
+function themeLockTarget() {
+  if (isCkTheme()) return "ling";
+  return null;
+}
+function applyThemeLock() {
+  const t = themeLockTarget();
+  if (!t) return;
+  state.target = t;
+  document.querySelectorAll("#targetOpts .opt-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.v === t);
+  });
+}
+// 主题切换统一入口：手动点击由 bindOpts 处理，程序化切换（分组自动关联）
+// 走这里，保证按钮高亮与主角锁定同步更新。
+function setTheme(t) {
+  // Dior 时尚专用模式（v58）：主题恒为 Dior —— 分组自动关联、手动点击都改不走，
+  // 退出该模式时才还原（见 setMode）。
+  if (state.mode === "dior") t = "dior";
+  if (!t || t === state.theme) return;
+  state.theme = t;
+  document.querySelectorAll("#themeOpts .opt-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.v === t);
+  });
+  applyThemeLock();
+}
+// Dior 专用模式兜底：正常情况主题区已被 CSS 隐藏，这里防的是「万一被点到」
+// （bindOpts 会先把 state.theme 写成被点的值，所以这个监听要把主题拉回 Dior）
+function enforceModeThemeLock() {
+  if (state.mode !== "dior" || state.theme === "dior") return;
+  state.theme = "dior";
+  document.querySelectorAll("#themeOpts .opt-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.v === "dior");
+  });
+}
+document.getElementById("themeOpts").addEventListener("click", (e) => {
+  if (!e.target.closest(".opt-btn")) return;
+  enforceModeThemeLock();
+  applyThemeLock();
+});
+document.getElementById("targetOpts").addEventListener("click", () => {
+  applyThemeLock();
+});
+
+// ---------- 模式切换：LingOrm 通用 ⇄ Dior 时尚专用（v58） ----------
+// 顶部入口按钮，点一下进入「Dior 时尚文案生成器」：主题固定 Dior（时尚正式文风、
+// 单人 / 双人都用完整姓名、不用负面表情），主角仍可选 CP / Ling / Orm；
+// 再点一下返回通用模式，并还原进入前选的主题。
+// 实现约束：只切 #wrap 上的 class（隐藏主题区、换黑金视觉全由 CSS 负责），
+// 不触碰 document.body —— 这样 Node vm 沙盒回归测试无需改动即可跑通。
+const MODE_UI = {
+  lingorm: {
+    ico: "🎩",
+    t1: "切换为 Dior 时尚文案生成器",
+    t2: "Dior 专用模式 · 时尚正式文风",
+    arrow: "→",
+    title: "✨ LingOrm 刷推文案生成器",
+    sub: "夸赞 Ling & Orm 的美貌、演技或时尚 · 英文短句 + 当日关键字 + 标签",
+    gen: "🌟 生成刷推文案"
+  },
+  dior: {
+    ico: "←",
+    t1: "返回 LingOrm 刷推文案生成器",
+    t2: "当前：Dior 时尚专用模式",
+    arrow: "",
+    title: "🖤 Dior 时尚文案生成器",
+    sub: "Dior 时尚正式文风 · 单人 / 双人均用完整姓名 · 英文短句 + 当日关键字 + 标签",
+    gen: "✦ 生成 Dior 时尚文案"
+  }
+};
+function isDiorMode() { return state.mode === "dior"; }
+function modeText(id, s) {
+  const el = document.getElementById(id);
+  if (el && el.textContent !== s) el.textContent = s;
+}
+// 按当前模式刷新界面文案与整体视觉（显隐由 CSS 的 .wrap.dior-mode 控制）
+function renderModeUI() {
+  const dior = isDiorMode();
+  const U = dior ? MODE_UI.dior : MODE_UI.lingorm;
+  const wrap = document.getElementById("wrap");
+  if (wrap) wrap.classList.toggle("dior-mode", dior);
+  modeText("modeIco", U.ico);
+  modeText("modeTitle", U.t1);
+  modeText("modeHint", U.t2);
+  modeText("modeArrow", U.arrow);
+  modeText("appTitle", U.title);
+  modeText("appSub", U.sub);
+  modeText("genBtn", U.gen);
+  renderPlatformUI(); // 平台模块（X / IG）与模式联动
+}
+function setMode(m) {
+  const want = (m === "dior") ? "dior" : "lingorm";
+  if (want === state.mode) return;
+  if (want === "dior") {
+    state.prevTheme = state.theme; // 记住进入前的主题，退出时还原
+    state.mode = "dior";           // 先置模式，setTheme 才会按模式把主题钉在 Dior
+    setTheme("dior");
+  } else {
+    state.mode = "lingorm";
+    state.platform = "x";          // 退出 Dior 模式时回到 X 模块
+    const back = state.prevTheme;
+    state.prevTheme = null;
+    setTheme(back && back !== "dior" ? back : "random");
+  }
+  renderModeUI();
+}
+(function bindModeBtn() {
+  const btn = document.getElementById("modeBtn");
+  if (btn && btn.addEventListener) {
+    btn.addEventListener("click", () => setMode(isDiorMode() ? "lingorm" : "dior"));
+  }
+  renderModeUI();
+})();
+
+// ---------- Dior 模式内的平台模块：X 推文 / IG 文案（v59） ----------
+// 只在 Dior 时尚专用模式下出现（CSS 控制 tab 显隐）：
+//   🐦 X 推文 = 本项目的刷推文案生成（原有功能，不动）
+//   📷 IG 文案 = 整合进来的 Dior IG Caption 生成器（见文件末尾 IG 模块）
+// 通用模式下没有平台切换，一律回到 X，避免退出后停在 IG 视图。
+function setPlatform(p) {
+  const want = (p === "ig") ? "ig" : "x";
+  if (want === "ig" && state.mode !== "dior") return; // 通用模式下没有平台切换
+  if (want === state.platform) return;
+  state.platform = want;
+  renderPlatformUI();
+}
+function renderPlatformUI() {
+  const ig = (state.mode === "dior" && state.platform === "ig");
+  const wrap = document.getElementById("wrap");
+  if (wrap && wrap.classList) wrap.classList.toggle("pf-ig", ig);
+  const tabs = [["platX", "x"], ["platIG", "ig"]];
+  tabs.forEach(pair => {
+    const el = document.getElementById(pair[0]);
+    if (el && el.classList) el.classList.toggle("active", (pair[1] === "ig") === ig);
+  });
+}
+(function bindPlatTabs() {
+  [["platX", "x"], ["platIG", "ig"]].forEach(pair => {
+    const el = document.getElementById(pair[0]);
+    if (el && el.addEventListener) el.addEventListener("click", () => setPlatform(pair[1]));
+  });
+  renderPlatformUI();
+})();
+
+// ---------- 日期信息 ----------
+const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const now = new Date();
+const weekday = WEEKDAYS[now.getDay()];
+const monthName = MONTHS[now.getMonth()];
+const dateNum = now.getDate();
+const mmdd = String(now.getMonth()+1).padStart(2,"0") + String(dateNum).padStart(2,"0");
+// 当日配置键（与 config.js 的 daily 键格式一致："MM-DD"）
+const dailyKey = String(now.getMonth()+1).padStart(2,"0") + "-" + String(dateNum).padStart(2,"0");
+document.getElementById("dateBanner").textContent =
+  `📅 ${weekday}, ${monthName} ${dateNum}, ${now.getFullYear()}`;
+
+// ---------- 名字 ----------
+const NAMES = {
+  ling: "Lingling Kwong",
+  orm:  "Orm Kornnaphat",
+  cp:   "LingOrm"
+};
+
+// ---------- 文案素材池（粉丝口语碎片风格，v53 重写） ----------
+// 设计原则：
+//   1) 短句 + 碎片、小写起始、情绪直给，像真人刷推，而不是广告文案；
+//   2) 不用破折号长句，不用「No notes. / Period. / main character energy /
+//      understood the assignment / ate, no crumbs」这类一眼 AI 的套话；
+//   3) 品牌名每条只出现 1~2 次（由组装逻辑保证），不再每句硬塞；
+//   4) 专有名词（Lingling Kwong / Orm Kornnaphat / LingOrm / Calvin Klein / Dior）
+//      永远保持正确大小写，其余全部小写 —— 这是真人发推的写法。
+// 组合空间 = 名字碎片 × 情绪碎片 × 连接方式 × 表情，单主题 > 10^6。
+
+// 情绪碎片（不带名字、不带品牌）：整条的语气尾巴，接在陈述句之后
+const MOODS = [
+  "i'm not okay", "i'm not ok", "i can't do this today", "help", "send help",
+  "the way i gasped", "no thoughts just this", "my heart can't take this",
+  "i need a minute", "i'm not built for this", "crying", "screaming",
+  "who allowed this", "i'm on the floor", "not me sobbing over this",
+  "i'm fine (i'm not)", "this is so unfair", "i felt that in my chest",
+  "nobody talk to me", "i'm going feral", "i have no words", "wait",
+  "i'm done for today", "and i have work tomorrow", "i should be asleep",
+  "i'm crying at 1am again", "the way i ran to my phone", "breathe, me",
+  "this is so much", "i'm unwell", "someone hold me", "i'm shaking",
+  "that's it, i'm done", "i wasn't ready for this", "i need to sit down",
+  "how am i supposed to sleep now", "i'm smiling at my screen like an idiot",
+  "nobody warned me", "why am i like this", "i'm never recovering from this",
+  "i'm so normal about this", "ok noted", "this should be illegal",
+  "i'm actually crying", "i can't stop watching", "my whole day is better now",
+  "and i mean that", "truly", "fr", "haha no i'm ok", "i'm so cooked",
+  "look at them", "i'm saving this", "no no no", "ok but why", "excuse me",
+  "i'm totally fine about this", "i need a hobby that isn't this", "stop it",
+  "it's too much", "i'm losing it", "not a single thought", "i'm on my knees",
+  "this is my whole personality now", "i don't know what to do with myself"
+];
+// 情绪碎片（单人主角专用，可以出现 she / her）
+const HER_MOODS = [
+  "look at her", "that's my girl", "i love her your honor", "she's so real",
+  "she knows what she's doing", "she's not even trying", "this girl",
+  "she's unreal", "her face, i can't", "she really did that",
+  "obsessed with her, actually", "she's the moment", "she's everything",
+  "she never misses", "protecting my peace by staring at her photos"
+];
+// 时尚正式主题（Dior / CK）专用的收尾句（v56）：编辑口吻、完整句、首字母大写，
+// 不用口语碎片与情绪化表达，也不带任何负面情绪。
+const FORMAL_MOODS = [
+  "A defining moment for the season.",
+  "The standard has been raised again.",
+  "Considered, precise, complete.",
+  "This is how it should be done.",
+  "A quiet statement, delivered perfectly.",
+  "Composure, from the first frame.",
+  "Restraint has rarely looked this assured.",
+  "The season has found its image.",
+  "Precision, and nothing less.",
+  "Elegance, fully accounted for.",
+  "An image worth returning to.",
+  "The mood, exactly right.",
+  "Assured from beginning to end.",
+  "A lesson in composure.",
+  "Simple, and completely certain.",
+  "The proportions speak for themselves."
+];
+// 碎片之间的连接方式（前一片段已以 ? ! . , 结尾时固定用一个空格）
+const JOINERS = [", ", ", ", ". ", ". "];
+// 时尚正式主题的连接方式：只用句号断句（正式口吻不该用逗号把两个完整句连起来）
+const FORMAL_JOINERS = [". ", ". "];
+// 片段末尾 / 句中表情
+// 只保留正向 / 中性表情（v56 用户要求「不要有负面的表情符号」）：
+// 😭 😩 😔 💀 🙃 🫠 🤧 😮‍💨 🥹 这类哭泣 / 崩溃 / 沮丧表情一律不再出现。
+const EMOJIS = [
+  "", "", "", " 💜", " 🫶", " 😍", " 🥰", " ✨", " 🔥", " 💫", " 🤍"
+];
+// 时尚正式主题（Dior / CK）专用的克制表情：多数不加，偶尔一个精致符号
+const FORMAL_EMOJIS = ["", "", "", "", " ✨", " 🤍"];
+
+// 单个主题的碎片池：
+//   name      —— 含名字（不含品牌）
+//   nameBrand —— 含名字 + 品牌（时尚主题专用）
+//   brandOnly —— 只含品牌（时尚主题，用于第二次品牌提及）
+//   pair      —— CP 专属（可含 LingOrm；Dior+CP 因「名字各一次」不会用到）
+const FRAGS = {
+  beauty: {
+    name: [
+      (n) => `${n} really woke up and chose to be this pretty`,
+      (n) => `${n}'s face card never declines`,
+      (n) => `why is ${n} like this`,
+      (n) => `not ${n} being this pretty today`,
+      (n) => `${n} is so pretty it hurts`,
+      (n) => `how is ${n} even real`,
+      (n) => `${n} looking like that at 3am??`,
+      (n) => `i saw ${n} and forgot how to breathe`,
+      (n) => `${n}'s smile is a whole crime`,
+      (n) => `${n} is so unfair to the rest of us`,
+      (n) => `ok ${n} i see you`,
+      (n) => `${n} with that face again`,
+      (n) => `${n} please, i'm begging`,
+      (n) => `${n} is the standard, sorry`,
+      (n) => `god really took his time with ${n}`,
+      (n) => `${n} existing is free therapy`,
+      (n) => `${n}'s eyes are doing something to me`,
+      (n) => `${n} in that lighting?? unreal`,
+      (n) => `that selca of ${n} ruined me`,
+      (n) => `${n} has no bad angles and it's insane`,
+      (n) => `${n} is proof that beauty is real`,
+      (n) => `i'm obsessed with everything about ${n}`,
+      (n) => `the prettiest person alive and it's ${n}`,
+      (n) => `${n} could wear a trash bag and still win`,
+      (n) => `one look at ${n} and i'm done`,
+      (n) => `${n} being this pretty is a public service`,
+      (n) => `${n} smiled and i folded`,
+      (n) => `i can't get over ${n}'s face`,
+      (n) => `${n} looks like a painting today`,
+      (n) => `${n} is out here raising the bar again`,
+      (n) => `${n} never has an off day, ever`,
+      (n) => `${n}'s glow is genuinely unfair`,
+      (n) => `every photo of ${n} is a new favourite`,
+      (n) => `${n} got me staring at my screen again`,
+      (n) => `${n} and that face, no break, not once`
+    ],
+    pair: [
+      `LingOrm in the same frame, that's it`,
+      `LingOrm side by side and i'm not ok`,
+      `two of them in one photo?? unfair`,
+      `LingOrm being this cute is not helping me`,
+      `the way LingOrm exist in the same photo`,
+      `LingOrm selca drops and my day is fixed`,
+      `no duo like LingOrm, ever`,
+      `LingOrm synchronised chaos, love that`,
+      `they're so in sync it's scary`,
+      `LingOrm really said watch us`,
+      `two visuals, one frame`,
+      `i don't have a favourite, it's both of them`,
+      `them existing together is enough for me`,
+      `LingOrm together is instant serotonin`,
+      `LingOrm content is a genre of its own`,
+      `every LingOrm photo is a gift`,
+      `their matching energy is everything`,
+      `LingOrm in one picture, my heart`,
+      `LingOrm are so comfortable together it hurts`,
+      `the two of them, i can't deal`
+    ]
+  },
+  acting: {
+    name: [
+      (n) => `${n} in that scene though`,
+      (n) => `${n}'s eyes did all the talking`,
+      (n) => `${n} with that one look`,
+      (n) => `the way ${n} delivered that line`,
+      (n) => `not ${n} making me cry over a two minute scene`,
+      (n) => `${n} deserved a whole award for that`,
+      (n) => `i rewound ${n}'s scene five times`,
+      (n) => `${n} really said let me act and destroyed us`,
+      (n) => `${n}'s micro expressions are insane`,
+      (n) => `nobody does quiet devastation like ${n}`,
+      (n) => `${n} put her whole soul into that scene`,
+      (n) => `that one tear from ${n} broke me`,
+      (n) => `${n}'s voice control in that scene`,
+      (n) => `${n} out here making me feel things`,
+      (n) => `give ${n} a lead role immediately`,
+      (n) => `the range on ${n} though`,
+      (n) => `${n} went from comedy to crying in one episode`,
+      (n) => `${n}'s line delivery never misses`,
+      (n) => `${n} is the reason i'm watching this`,
+      (n) => `i forgot ${n} was even acting`,
+      (n) => `${n} made that script sound like real life`,
+      (n) => `${n} just gets the character`,
+      (n) => `the tiny pause before ${n}'s line, that's acting`,
+      (n) => `${n} doing all of this with one look`,
+      (n) => `i need ${n} in every drama`,
+      (n) => `${n} acted like the camera wasn't even there`,
+      (n) => `${n}'s crying scene, i'm not okay`,
+      (n) => `waiting for ${n}'s next project already`,
+      (n) => `${n} believed every word she said`,
+      (n) => `that switch in ${n}'s face mid scene`,
+      (n) => `${n} and that script are a perfect match`,
+      (n) => `i'm rewatching ${n}'s scenes instead of sleeping`,
+      (n) => `${n} made me feel that in my chest`,
+      (n) => `${n} keeps getting better every episode`,
+      (n) => `${n} read that line like it was hers`
+    ],
+    pair: [
+      `LingOrm in one scene and i'm gone`,
+      `their scenes are my whole personality`,
+      `LingOrm acting together is unfair`,
+      `LingOrm scene and i stop breathing`,
+      `two of them acting in one frame?? yes`,
+      `LingOrm have that once in a decade chemistry`,
+      `their eye contact does more than dialogue`,
+      `LingOrm's quiet scenes hit the hardest`,
+      `they act like they've known each other forever`,
+      `LingOrm make me forget it's a script`,
+      `every LingOrm scene gets replayed`,
+      `two crying scenes in one episode?? cruel`,
+      `their timing together is unreal`,
+      `LingOrm scene equals instant tears`,
+      `LingOrm don't even need dialogue`,
+      `the tension LingOrm bring into one room`,
+      `LingOrm acting is the reason i'm seated`,
+      `LingOrm's chemistry carries the whole show`,
+      `watching LingOrm react to each other, that's the show`,
+      `LingOrm listening to each other, that's the craft`
+    ]
+  },
+  // 时尚主题（Dior / CK）—— v56 起改为**时尚正式口吻**（用户要求「时尚正式化」）：
+  //   · 完整句、首字母大写、以句号收尾，像品牌稿 / 时尚媒体笔法；
+  //   · 不再用 v53 的粉丝口语碎片（那些留给 beauty / acting 两个主题）；
+  //   · 长短模板都有，保证在 110~205 的各种长度预算下都能拼出合规文案。
+  fashion: {
+    name: [
+      (n) => `${n} defines modern restraint.`,
+      (n) => `${n} wears the collection with ease.`,
+      (n) => `Quiet authority, from ${n}.`,
+      (n) => `${n} makes restraint look regal.`,
+      (n) => `${n} brings presence to the season.`,
+      (n) => `There is intent in every look ${n} wears.`,
+      (n) => `${n} treats dressing as a discipline.`,
+      (n) => `${n} gives the collection a human centre.`,
+      (n) => `Elegance settles naturally on ${n}.`,
+      (n) => `${n} understands that restraint is a luxury.`,
+      (n) => `The cut finds its natural home on ${n}.`,
+      (n) => `${n} moves with the assurance of someone who belongs here.`,
+      (n) => `A composed presence, and that is ${n}.`,
+      (n) => `${n} favours structure over ornament.`,
+      (n) => `Every line is deliberate on ${n}.`,
+      (n) => `${n} carries the mood without effort.`,
+      (n) => `Poise is the first thing you notice about ${n}.`,
+      (n) => `${n} brings a modern stillness to the frame.`,
+      (n) => `Nothing on ${n} is accidental.`,
+      (n) => `${n} defines what considered dressing looks like.`,
+      (n) => `There is a calm certainty to ${n}.`,
+      (n) => `${n} makes simplicity look expensive.`,
+      (n) => `Sharp, composed, unmistakable: ${n}.`,
+      (n) => `${n} gives restraint a sharper edge.`
+    ],
+    nameBrand: [
+      (n, b) => `${n} opens the ${b} chapter.`,
+      (n, b) => `${n} for ${b}: pure restraint.`,
+      (n, b) => `${b} finds its clearest voice in ${n}.`,
+      (n, b) => `${n} in ${b}, with quiet authority.`,
+      (n, b) => `Dressed by ${b}, ${n} makes restraint look regal.`,
+      (n, b) => `${n} brings a sculpted ease to ${b}.`,
+      (n, b) => `The ${b} codes settle perfectly on ${n}.`,
+      (n, b) => `${n} and ${b} share the same composure.`,
+      (n, b) => `In ${b}, ${n} favours structure over noise.`,
+      (n, b) => `${n} wears ${b} like a second language.`,
+      (n, b) => `Every ${b} line on ${n} is placed with intent.`,
+      (n, b) => `${b} and ${n}: precision, and presence.`,
+      (n, b) => `${n} gives ${b} a calmer, sharper reading.`
+    ],
+    brandOnly: [
+      (b) => `${b} continues to define modern restraint.`,
+      (b) => `Another ${b} season, another study in proportion.`,
+      (b) => `The ${b} codes remain unmistakable.`,
+      (b) => `${b} proves that precision never dates.`,
+      (b) => `This is ${b} at its most considered.`,
+      (b) => `Quiet luxury, fully realised by ${b}.`,
+      (b) => `${b} keeps the discipline and drops the noise.`,
+      (b) => `The ${b} attitude, unchanged and certain.`,
+      (b) => `${b} makes restraint feel like the boldest choice.`,
+      (b) => `A wardrobe with the ${b} signature throughout.`
+    ],
+    // 时尚正式主题的无名补句（不含人名、不含品牌）：用来补长度、加层次
+    craft: [
+      `Structure, ease and intent, in equal measure.`,
+      `A reminder that good design needs no explanation.`,
+      `Tailoring that moves with the body, not against it.`,
+      `Considered, composed and entirely of the moment.`,
+      `The mood is confident, the execution exact.`,
+      `An exercise in balance between form and ease.`,
+      `Nothing extra, nothing missing.`,
+      `The collection speaks in a measured tone.`,
+      `Precision in the cut, calm in the styling.`,
+      `A palette kept deliberately quiet.`,
+      `The proportions do the talking.`,
+      `Less, but resolved.`
+    ],
+    // CP 专属（含 LingOrm）：Dior+CP 因「两人全名各只出现一次」不会用到
+    pair: [
+      `LingOrm share the same composure.`,
+      `Two distinct styles, in one frame.`,
+      `LingOrm bring balance to the collection.`,
+      `Two presences, one clear mood.`
+    ]
+  },
+  // 品牌大使主题（v80，Leapmotor B03X 起）—— **粉丝口语**文风（与 CK / Dior 的时尚正式
+  // 文风不同，不走 isFormalTheme），但每条都必须落到该品牌上：
+  //   · nameBrand（首片必用）—— 姓名 + 品牌 + 大使身份，保证「品牌露出 + 大使关系」；
+  //   · name（可选一片）—— 只提姓名的大使语境句，用来加层次、不重复品牌字样；
+  //   · brandOnly —— 只提品牌，作为第二次品牌提及；
+  //   · pair —— CP 场景用（本组是单人，实际很少走到）；
+  // 硬约束见 bodyHasBrand()：整条正文必须含品牌名，不含就重来。
+  leapmotor: {
+    nameBrand: [
+      (n, b) => `${n} is the new face of ${b}`,
+      (n, b) => `${n} as the ${b} ambassador, we're so proud`,
+      (n, b) => `brand ambassador ${n} and ${b}, what a match`,
+      (n, b) => `${n} for ${b} and honestly the partnership fits her well`,
+      (n, b) => `the ${b} campaign with ${n} is everything`,
+      (n, b) => `${n} repping ${b} like she owns it`,
+      (n, b) => `${n} teaming up with ${b} is my favourite news`,
+      (n, b) => `seeing ${n} as the face of ${b} made my week`,
+      (n, b) => `${n} walking into her ${b} ambassador era`,
+      (n, b) => `${n} is the ambassador ${b} needed`,
+      (n, b) => `${n} fronting ${b}, exactly as it should be`,
+      (n, b) => `${b} got the right ambassador in ${n}`,
+      (n, b) => `${n} in the ${b} campaign spotlight, deserved`,
+      (n, b) => `${n} x ${b} is a partnership i needed`,
+      (n, b) => `${n} as the ${b} ambassador making it look this good`,
+      (n, b) => `${n} announced as the ${b} ambassador and i cheered`,
+      (n, b) => `${n}'s ${b} ambassador era has officially started`,
+      (n, b) => `${b} ambassador ${n} never misses`,
+      (n, b) => `${n} and a ${b} partnership, of course she said yes`,
+      (n, b) => `${n} bringing ${b} to a new audience as ambassador`
+    ],
+    name: [
+      (n) => `${n} really said hello ambassador life`,
+      (n) => `not ${n} having a whole campaign now`,
+      (n) => `${n} in her ambassador era and it shows`,
+      (n) => `${n} keeps collecting blue chip brands like it's nothing`,
+      (n) => `${n} on a billboard?? i might cry`,
+      (n) => `${n} doing brand work with that face, of course`,
+      (n) => `${n} makes a partnership announcement look effortless`,
+      (n) => `${n} and a new campaign, my two favourite things`,
+      (n) => `ambassador ${n} is a whole era`,
+      (n) => `${n} really is the blueprint for brand deals`
+    ],
+    brandOnly: [
+      (b) => `${b} really chose the right person`,
+      (b) => `that ${b} reveal is still living in my head`,
+      (b) => `the ${b} rollout came out so clean`,
+      (b) => `${b} never looked this good before`,
+      (b) => `everything about the ${b} rollout is so her`,
+      (b) => `${b} plus her face is a dangerous combo`
+    ],
+    pair: [
+      `LingOrm in one campaign would end me`,
+      `two of them for one brand, too much power`,
+      `LingOrm would sell out anything`,
+      `give LingOrm the group campaign already`
+    ]
+  }
+};
+// 主题 → 品牌名 / 卡片标签 映射
+const THEME_BRAND = { ck: "Calvin Klein", dior: "Dior", leapmotor: "Leapmotor B03X" };
+const THEME_LABEL = { random: "随机混搭", beauty: "美貌", acting: "演技", ck: "CK", dior: "Dior", leapmotor: "Leapmotor B03X" };
+// 品牌主题（v80）：不做时尚正式文风（仍走粉丝口语），但**整条正文必须落到品牌上**：
+//   ① 必须出现品牌名（brandRe）；② 必须点明大使 / 合作身份（roleRe）。
+// 与 isFormalTheme 分开，避免把 CK / Dior 的全名 / 克制表情那套约束套到口语品牌主题上。
+// 加新品牌：在表里补一行即可（key 要同时写进上面的 THEME_KEYS）。
+const BRAND_THEMES = {
+  leapmotor: {
+    brandRe: /leapmotor/i,
+    roleRe: /(ambassador|face of|partner|campaign|teaming up|fronting|repping)/i
+  }
+};
+function isBrandTheme(theme) { return !!BRAND_THEMES[theme]; }
+// 品牌名露出（品牌主题专用；其它主题恒为 true）
+function bodyHasBrand(body, theme) {
+  const c = BRAND_THEMES[theme];
+  return c ? c.brandRe.test(String(body)) : true;
+}
+// 大使 / 合作身份露出（品牌主题专用；其它主题恒为 true）
+function bodyHasBrandRole(body, theme) {
+  const c = BRAND_THEMES[theme];
+  return c ? c.roleRe.test(String(body)) : true;
+}
+function themePoolOf(theme) {
+  if (theme === "beauty") return FRAGS.beauty;
+  if (theme === "ck" || theme === "dior") return FRAGS.fashion;
+  if (theme === "leapmotor") return FRAGS.leapmotor;
+  return FRAGS.acting;
+}
+function themeLabelOf(theme) { return THEME_LABEL[theme] || "演技"; }
+// CK 主题判断：选中时主角强制关联 Ling
+function isCkTheme() { return state.theme === "ck"; }
+// 时尚正式主题（Dior / Calvin Klein）判断（v56）：
+//   命中时 → 用「时尚正式」素材池（完整句、编辑口吻）、主角（单人/双人）都必须是
+//   完整姓名、表情只用克制符号。beauty / acting 保持 v53 的粉丝口语风不变。
+function isFormalTheme(theme) { return theme === "ck" || theme === "dior"; }
+
+const BASE_TAGS = ["#LingOrm", "#LinglingKwong", "#OrmKornnaphat", "#หลิงออม"];
+
+// ---------- 当日关键字 / 标签分组（后台 config.js 控制，前台只读） ----------
+// 每个分组可设置 start / end 存在时间（"YYYY-MM-DD HH:mm"），
+// 只有当前时间落在其时间窗内的分组才会显示并可供选择。
+function parseTime(str) {
+  if (!str) return null;
+  const d = new Date(String(str).replace(" ", "T"));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// ---------- 标签写法归一化 ----------
+// 后台 config.js 的 tags 支持两种写法：
+//   ① ["#A", "#B"]                → 每个标签独占一行（历史写法）
+//   ② [["#A", "#B"], ["#C"]]      → 每个子数组一行（按后台提供的分行格式输出）
+// 顺序一律原样保留，前台不做任何排序 / 去重 / 重排。
+function flatTags(g) {
+  const out = [];
+  ((g && g.tags) || []).forEach(t => {
+    if (Array.isArray(t)) {
+      t.forEach(x => { if (x) out.push(String(x)); });
+    } else if (t) out.push(String(t));
+  });
+  return out;
+}
+function tagLinesOf(g) {
+  const lines = [];
+  ((g && g.tags) || []).forEach(t => {
+    if (Array.isArray(t)) {
+      const s = t.filter(Boolean).join(" ");
+      if (s) lines.push(s);
+    } else if (t) lines.push(String(t));
+  });
+  return lines;
+}
+// 整块「关键字 + 标签」的尾部文本长度（用于 220 字符预算）
+function tailLengthOf(g) {
+  return 2 + String((g.keywords || []).join(", ")).length + 1 +
+    tagLinesOf(g).join("\n").length;
+}
+
+function activeGroups() {
+  const C = (typeof CONFIG !== "undefined") ? CONFIG : {};
+  const daily = C.daily || {};
+  let groups = [];
+  // 遍历所有日期条目：设了时间窗(start/end)的分组按时间窗生效（支持跨天），
+  // 未设时间窗的分组只在所属日期当天生效。
+  Object.keys(daily).forEach(k => {
+    const dayCfg = daily[k];
+    if (!dayCfg) return;
+    if (Array.isArray(dayCfg.groups)) {
+      dayCfg.groups.forEach(g => {
+        const s = parseTime(g.start), e = parseTime(g.end);
+        const hasWindow = !!(g.start || g.end);
+        if (hasWindow) {
+          if (s && now < s) return;   // 还未开始
+          if (e && now > e) return;   // 已结束
+        } else if (k !== dailyKey) {
+          return;                     // 无时间窗：仅当天生效
+        }
+        groups.push({
+          name: g.name || "未命名分组",
+          keywords: (g.keywords || []).filter(Boolean),
+          tags: flatTags(g),
+          tagLines: tagLinesOf(g),
+          theme: g.theme || null,   // 分组显式指定的默认主题（可选，见 themeFromGroup）
+          window: hasWindow
+            ? `${g.start || "不限"} ~ ${g.end || "不限"}`
+            : "当日有效"
+        });
+      });
+    } else if (k === dailyKey && ((dayCfg.keywords && dayCfg.keywords.length) || (dayCfg.tags && dayCfg.tags.length))) {
+      // 兼容旧格式：整日单一配置
+      groups.push({
+        name: "当日配置",
+        keywords: (dayCfg.keywords || []).filter(Boolean),
+        tags: flatTags(dayCfg),
+        tagLines: tagLinesOf(dayCfg),
+        theme: dayCfg.theme || null,
+        window: "当日有效"
+      });
+    }
+  });
+  if (!groups.length) {
+    const dft = { keywords: (C.keywords || []).filter(Boolean), tags: (C.tags || BASE_TAGS).filter(Boolean) };
+    groups = [{
+      name: "默认配置",
+      keywords: dft.keywords,
+      tags: flatTags(dft),
+      tagLines: tagLinesOf(dft),
+      window: "长期默认"
+    }];
+  }
+  return groups;
+}
+
+const groups = activeGroups();
+state.group = 0;
+
+function selectedGroup() { return groups[state.group] || groups[0]; }
+function kwLine()  { return selectedGroup().keywords.join(", "); }
+// 标签：按后台提供的顺序与分行格式原样输出（不做排序/去重/重排）
+function tagLine() { return (selectedGroup().tagLines || selectedGroup().tags || []).join("\n"); }
+
+// ---------- 主角与分组自动关联 ----------
+// 规则（基于分组的关键词 + 标签）：
+//   ① 先看有没有点名「全名标签」（最精确的信号，优先判定）：
+//        #LinglingKwong + #OrmKornnaphat 都在 → LingOrm CP
+//        只有 #OrmKornnaphat                → Orm (Orm Kornnaphat)
+//        只有 #LinglingKwong                → Ling (Lingling Kwong)
+//      必须优先于「关键词里的 LingOrm」：同一个活动的多个变体分组会共用含 LingOrm 的
+//      关键字/话题标签（如 #LingOrmDiorSummer27），只有全名标签能区分 CP / 单人。
+//   ② 没有任何全名标签时，退回按文本字样判断：
+//        含 "lingorm"           → LingOrm CP（LingOrm 优先）
+//        只含 "orm"（无 ling）   → Orm (Orm Kornnaphat)
+//        只含 "ling"（无 orm）   → Ling (Lingling Kwong)
+//        无法判定（如全泰文）     → 保持用户当前选择
+function leadFromGroup(g) {
+  const text = (g.keywords || []).concat(flatTags(g)).join(" ").toLowerCase();
+  // ① 全名标签优先（#LinglingKwong / #OrmKornnaphat）
+  const hasLingTag = /#linglingkwong\b/.test(text);
+  const hasOrmTag  = /#ormkornnaphat\b/.test(text);
+  if (hasLingTag && hasOrmTag) return "cp";
+  if (hasOrmTag) return "orm";
+  if (hasLingTag) return "ling";
+  // ② 无全名标签 → 退回字样判断
+  if (/lingorm/.test(text)) return "cp";
+  const hasLing = /ling/.test(text);
+  const hasOrm  = /orm/.test(text);
+  if (hasOrm && !hasLing) return "orm";
+  if (hasLing && !hasOrm) return "ling";
+  return null;
+}
+// ---------- 文案主题与分组自动关联 ----------
+// 规则（基于分组的关键词 + 标签）：标签/关键词里点名了品牌 → 选中该分组时
+// **默认切到对应主题**（只是默认值，用户仍可手动改；切走后不再回拉）。
+// 目前识别 Dior；要加其它品牌，在表里补一行（小写片段 → 主题 key）即可。
+// 可用主题 key —— 分组显式指定主题时用它做白名单校验，写错 key 会被忽略（退回品牌推断），
+// 不会把主题搞成不存在的值。
+// 前 5 个与 #themeOpts 的 data-v 一一对应（用户可手动点选）；
+// "leapmotor"（v80）是**品牌大使主题**，属于单个 campaign 专用，不出现在按钮里，
+// 只能由 config.js 里分组的 `theme` 字段指定 —— 这样其它日子的页面不会多出一个无关品牌按钮。
+const THEME_KEYS = ["random", "beauty", "acting", "ck", "dior", "leapmotor"];
+const THEME_BY_BRAND = [
+  ["dior", "dior"]
+];
+function themeFromGroup(g) {
+  // ① 分组**显式指定**主题优先：config.js 里给该分组写 `theme: "random"` 之类，
+  //    选这一组时就默认切到该主题（仍是默认值，用户随后手动改走不回拉）。
+  //    典型用途：无品牌标签的分组要求「默认随机混搭」。
+  if (g.theme && THEME_KEYS.indexOf(g.theme) !== -1) return g.theme;
+  // ② 否则按关键词 / 标签里的品牌字样推断
+  const text = (g.keywords || []).concat(flatTags(g)).join(" ").toLowerCase();
+  for (let i = 0; i < THEME_BY_BRAND.length; i++) {
+    if (text.indexOf(THEME_BY_BRAND[i][0]) !== -1) return THEME_BY_BRAND[i][1];
+  }
+  return null; // 未点名品牌（如纯泰文/人名标签）→ 保持用户当前主题
+}
+
+function setTarget(t) {
+  if (!t || t === state.target) return;
+  // 主题锁定下主角强制关联（仅 CK→Ling；Dior 不锁定，含分组自动匹配的写入）
+  const lockT = themeLockTarget();
+  if (lockT && t !== lockT) t = lockT;
+  state.target = t;
+  document.querySelectorAll("#targetOpts .opt-btn").forEach(b => {
+    b.classList.toggle("active", b.dataset.v === t);
+  });
+}
+
+// 渲染分组选择按钮
+function renderGroupOpts() {
+  const box = document.getElementById("groupOpts");
+  box.innerHTML = "";
+  groups.forEach((g, i) => {
+    const btn = document.createElement("button");
+    btn.className = "opt-btn" + (i === state.group ? " active" : "");
+    btn.textContent = `${g.name}（${g.window}）`;
+    btn.addEventListener("click", () => {
+      state.group = i;
+      box.querySelectorAll(".opt-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      // 主题先切（品牌标签 → 默认主题），再切主角（CK 主题会锁 Ling，故顺序不能反）
+      setTheme(themeFromGroup(g));
+      setTarget(leadFromGroup(g)); // 主题 / 主角随分组自动关联
+      renderKwPanel();
+    });
+    box.appendChild(btn);
+  });
+}
+
+// 渲染只读展示面板（当前选中分组）
+function renderKwPanel() {
+  const g = selectedGroup();
+  // 分组显式指定了默认主题时多显示一行，让用户知道主题为什么被切换（仍可手动改）
+  const themeRow = g.theme
+    ? `<div class="kw-row"><span class="kw-label">主&nbsp;&nbsp;&nbsp;题</span><span class="kw-val">${esc(themeLabelOf(g.theme))}（选本组时默认）</span></div>`
+    : "";
+  document.getElementById("kwPanel").innerHTML =
+    `<div class="kw-row"><span class="kw-label">关键字</span><span class="kw-val">${esc(g.keywords.join(", "))}</span></div>` +
+    themeRow +
+    `<div class="kw-row"><span class="kw-label">标&nbsp;&nbsp;&nbsp;签</span><span class="kw-val">${esc((g.tagLines || g.tags || []).join("\n"))}</span></div>` +
+    `<div class="lock">🔒 ${g.name} · ${g.window} · 前台不可更改</div>`;
+}
+renderGroupOpts();
+setTheme(themeFromGroup(selectedGroup()));  // 初始按默认分组自动匹配主题
+setTarget(leadFromGroup(selectedGroup()));  // 初始按默认分组自动匹配主角
+renderKwPanel();
+
+// ---------- 生成 ----------
+// 全站互不重复机制：每位访客首次访问时分配一个专属随机种子（持久存 localStorage），
+// 之后所有文案均由该种子驱动的伪随机序列生成——不同用户走各自独立的序列，
+// 配合 10^13 级别的组合空间，不同用户之间生成相同文案的概率趋近于 0。
+function getUserSeed() {
+  try {
+    let s = localStorage.getItem("lingorm_seed");
+    if (s === null || s === "" || isNaN(Number(s))) {
+      s = String(Math.floor(Math.random() * 4294967296));
+      try { localStorage.setItem("lingorm_seed", s); } catch (e2) {}
+    }
+    return Number(s) >>> 0;
+  } catch (e) {
+    // localStorage 不可用时用时间戳兜底（每次会话仍近似独立）
+    return (Date.now() ^ (Math.random() * 4294967296)) >>> 0;
+  }
+}
+const USER_SEED = getUserSeed();
+const SEED_ID = USER_SEED.toString(16).toUpperCase().padStart(8, "0").slice(-6);
+// 页面展示本设备专属序列号（便于确认互不重复机制已启用）
+(function () {
+  const b = document.getElementById("dateBanner");
+  if (b) b.textContent += ` · 专属序列 #${SEED_ID}`;
+})();
+
+// mulberry32 种子化伪随机数生成器
+let _rngState = USER_SEED;
+function rand() {
+  _rngState = (_rngState + 0x6D2B79F5) >>> 0;
+  let t = _rngState;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function pick(arr) { return arr[Math.floor(rand() * arr.length)]; }
+
+// 目标长度：正文 150 个字符起（按字符计，含空格）
+const TARGET_CHARS = 150;
+// 整条推文（正文 + 关键字 + 标签）总字符上限
+const MAX_TOTAL = 220;
+
+// 名字变体：同一人多种称呼，进一步扩大组合空间
+const NAME_VARIANTS = {
+  ling: ["Ling", "Lingling", "Lingling Kwong"],
+  orm:  ["Orm", "Orm Kornnaphat"],
+  cp:   ["LingOrm"]
+};
+// 全名：CP 模式硬性要求使用两人的完整姓名
+const FULL_NAMES = { ling: "Lingling Kwong", orm: "Orm Kornnaphat" };
+
+// ---------- 碎片生成 ----------
+// 一个「碎片」= 一句口语化的短句（陈述 / 反问 / 情绪），整条文案由 2~5 个碎片拼成。
+// 取一个含名字的碎片：withBrand=true 时用含品牌句式（时尚主题专用），
+// fullName=true 时强制用完整姓名（CP 场景要求）
+// avoidTpl：避免与上一条碎片用同一句式（CP 两人的句子撞模板会非常出戏）
+function nameFragPick(theme, who, fullName, withBrand, shortOnly, avoidTpl) {
+  const pool = themePoolOf(theme);
+  let name;
+  if (fullName) name = FULL_NAMES[who];
+  else if (shortOnly) {
+    // 第二条同人碎片固定用短称呼（Ling / Orm），避免整条重复拗口全名
+    const vs = NAME_VARIANTS[who];
+    name = pick(vs.slice(0, Math.max(1, vs.length - 1)));
+  } else name = pick(NAME_VARIANTS[who]);
+  const list = (withBrand && pool.nameBrand) ? pool.nameBrand : pool.name;
+  const brand = (list === pool.nameBrand) ? THEME_BRAND[theme] : undefined;
+  let tpl = pick(list), t = 0;
+  while (avoidTpl && tpl === avoidTpl && ++t < 12) tpl = pick(list);
+  return { text: tpl(name, brand), tpl: tpl };
+}
+
+function nameFrag(theme, who, fullName, withBrand, shortOnly) {
+  return nameFragPick(theme, who, fullName, withBrand, shortOnly, null).text;
+}
+
+// 只含品牌、不含名字的碎片（时尚主题用来补第二次品牌提及）
+function brandFrag(theme) {
+  const pool = themePoolOf(theme);
+  if (!pool.brandOnly) return "";
+  return pick(pool.brandOnly)(THEME_BRAND[theme]);
+}
+
+// 时尚正式主题的无名补句（不含人名、不含品牌）——用来加层次 / 补长度，
+// 保证单人主角「只用完整姓名」时不会再引入短称呼（Ling / Orm）。
+function craftFrag(theme) {
+  const pool = themePoolOf(theme);
+  if (!pool.craft || !pool.craft.length) return "";
+  return pick(pool.craft);
+}
+
+// CP 专属碎片（含 LingOrm）。Dior+CP 因「两人名字各只出现一次」不会走到这里
+function pairFrag(theme) {
+  const pool = themePoolOf(theme);
+  if (!pool.pair || !pool.pair.length) return "";
+  return pick(pool.pair);
+}
+
+// 收尾碎片：
+//   formal=true（时尚正式主题）→ FORMAL_MOODS，编辑口吻完整句，不带负面情绪；
+//   formal=false（beauty / acting）→ v53 口语情绪碎片，单人主角可出现 she / her。
+function moodFrag(allowHer, formal) {
+  if (formal) return pick(FORMAL_MOODS);
+  return pick(allowHer ? MOODS.concat(HER_MOODS) : MOODS);
+}
+// ---------- 去重 ----------
+// 整条去重：写入 localStorage（按天存），跨多次生成、跨刷新页面都不重复，次日自动重置
+const STORE_KEY = "lingorm_used_" + now.getFullYear() + "-" + dailyKey;
+function loadUsedBodies() {
+  try { return new Set(JSON.parse(localStorage.getItem(STORE_KEY) || "[]")); }
+  catch (e) { return new Set(); }
+}
+const usedBodies = loadUsedBodies();
+function saveUsedBodies() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(Array.from(usedBodies).slice(-10000))); }
+  catch (e) { /* 存储满等异常时忽略 */ }
+}
+
+// 组装一条完整文案：至少 2 句、句子间随机连接词、结尾随机表情。
+// maxChars 为该条正文允许的最大长度（由 generate 根据关键字+标签长度动态计算，
+// 保证整条推文 ≤ MAX_TOTAL=220）；缺省时沿用 [150, MAX_CHARS] 旧区间
+const MAX_CHARS = 205;
+
+// CP 模式硬性要求：整条正文必须同时出现 Ling 和 Orm 两个人的名字。
+// "LingOrm"/"LingOrm's" 一体出现视为两人都在；否则分别按独立名字判断。
+function bodyHasBothNames(body) {
+  const t = body.toLowerCase();
+  if (t.indexOf("lingorm") !== -1) return true;
+  const hasLing = /\bling\b/i.test(body) || t.indexOf("lingling") !== -1;
+  const hasOrm  = /\borm\b/i.test(body) || t.indexOf("kornnaphat") !== -1;
+  return hasLing && hasOrm;
+}
+
+// CP 模式全名要求：整条正文必须同时出现两人完整姓名
+// （Lingling Kwong + Orm Kornnaphat）
+function bodyHasBothFullNames(body) {
+  return /lingling kwong/i.test(body) && /orm kornnaphat/i.test(body);
+}
+
+// 统计某个名字在文本中出现的次数（不区分大小写，按整名匹配）
+function countName(text, name) {
+  const t = String(text).toLowerCase();
+  const n = String(name).toLowerCase();
+  let c = 0, i = 0;
+  while ((i = t.indexOf(n, i)) !== -1) { c++; i += n.length; }
+  return c;
+}
+
+// Dior 等时尚主题 + CP 主角的硬性要求：两人全名在整条正文中各只出现一次，
+// 且不再出现任何其它形式的名字（Ling / Lingling / LingOrm / Orm / Kornnaphat）。
+function bodyHasEachFullNameOnce(body) {
+  if (countName(body, FULL_NAMES.ling) !== 1) return false;
+  if (countName(body, FULL_NAMES.orm) !== 1) return false;
+  const rest = String(body).toLowerCase()
+    .split(FULL_NAMES.ling.toLowerCase()).join(" ")
+    .split(FULL_NAMES.orm.toLowerCase()).join(" ");
+  return !/(lingling|lingorm|\bling\b|\borm\b|kornnaphat)/.test(rest);
+}
+
+// 时尚正式主题 + 单人主角（v56 用户要求「主角不管单人还是双人都需要全名」）：
+// 必须出现该主角的完整姓名，且整条不得残留任何短称呼 / 另一位主角的名字。
+function bodyHasFullNameOnly(body, who) {
+  const full = FULL_NAMES[who];
+  if (!full) return true;
+  if (countName(body, full) !== 1) return false;
+  const rest = String(body).toLowerCase().split(full.toLowerCase()).join(" ");
+  const other = who === "ling" ? "orm" : "ling";
+  if (countName(rest, FULL_NAMES[other]) > 0) return false;
+  return !/(lingling|lingorm|\bling\b|\borm\b|kornnaphat)/.test(rest);
+}
+
+// 接缝口吃检测：两个碎片在逗号处拼接时，可能撞出 "…, that's it" + "that's it, i'm done"
+// 这种相邻重复（如 "LingOrm in the same frame, that's it, that's it, i'm done"）。
+// 两片本身都不重复、尾巴也没完全撞上，只有拼完才看得出来 —— 只能在成品上兜一道。
+function hasAdjacentDupClause(body) {
+  const segs = String(body).split(/[.?!]\s+|\s*,\s*/).map(function (x) { return x.trim(); }).filter(Boolean);
+  for (let i = 1; i < segs.length; i++) {
+    if (segs[i] === segs[i - 1] && segs[i].length >= 4) return true;
+  }
+  return false;
+}
+
+// 组装一条完整文案：2~5 个口语碎片（先陈述后情绪），随机连接 + 随机表情。
+// maxChars 为该条正文允许的最大长度（由 generate 根据关键字+标签长度动态计算），
+// 保证整条推文 ≤ MAX_TOTAL=220。
+function buildBody(target, theme, maxChars) {
+  const hi = maxChars || MAX_CHARS;
+  const lo = Math.min(TARGET_CHARS, hi);
+  // fashion / formal：时尚正式主题（Dior / CK）—— 完整句素材池 + 全名约束 + 克制表情
+  const fashion = isFormalTheme(theme);
+  // 品牌主题（v80，Leapmotor B03X）：粉丝口语文风不变，但首片必须带品牌（nameBrand 池），
+  // 整条正文还必须真的含品牌名（见下方 bodyHasBrand 硬约束）。
+  const brandTheme = isBrandTheme(theme);
+  // 时尚主题（Dior）+ CP：两人全名各只出现一次，正文最多两句带名字的碎片
+  const onceEachCp = target === "cp" && fashion;
+  const emojiPool = fashion ? FORMAL_EMOJIS : EMOJIS;
+  let best = "";
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const parts = [], seps = [], seen = new Set();
+    let len = 0;
+    // 逐片拼接；重复片段或放不下就返回 false（调用方决定是否收尾）
+    const addPart = function (t) {
+      if (!t || seen.has(t)) return false;
+      if (!parts.length) {
+        if (t.length > hi) return false;
+        parts.push(t); seen.add(t); len = t.length;
+        return true;
+      }
+      const prev = parts[parts.length - 1];
+      const sep = /[?!.,"'’]$/.test(prev) ? " " : pick(fashion ? FORMAL_JOINERS : JOINERS);
+      if (len + sep.length + t.length > hi) return false;
+      seps.push(sep); parts.push(t); seen.add(t); len += sep.length + t.length;
+      return true;
+    };
+
+    // 「尾巴撞车」检测：某片段逗号后的短尾巴（如 "help"）已经出现过就不再重复
+    const tailOf = function (s) { const a = s.split(","); return a[a.length - 1].trim(); };
+    const clashes = function (m) {
+      const tail = tailOf(m);
+      if (tail.length > 20) return false; // 只关心短尾巴
+      return parts.some(function (p) { return tailOf(p) === tail; });
+    };
+    // 从候选生成器里取一条「整条内不重复、尾巴不撞车」的碎片加入
+    const addFresh = function (gen, tries) {
+      for (let t = 0; t < (tries || 8); t++) {
+        const s = gen();
+        if (!s || seen.has(s) || clashes(s)) continue;
+        if (addPart(s)) return true;
+      }
+      return false;
+    };
+
+    if (target === "cp") {
+      const first = rand() < 0.5 ? "ling" : "orm";
+      const second = first === "ling" ? "orm" : "ling";
+      // 品牌主题的同一片也必须带品牌（nameBrand），否则 CP 场景可能通篇不提品牌
+      const f1 = nameFragPick(theme, first, true, fashion || brandTheme, false, null);
+      if (!addPart(f1.text)) continue;
+      // 第二个人换一个句式，避免「同一个说法套两遍」
+      const f2 = nameFragPick(theme, second, true, false, false, f1.tpl);
+      if (!addPart(f2.text)) continue;
+      if (onceEachCp) {
+        // 时尚正式 + CP：补一句无名正式短句加层次，再视情况补第二次品牌提及
+        // （无名碎片保证不会引入短称呼，破坏「全名各一次」）
+        if (rand() < 0.45) addFresh(function () { return craftFrag(theme); });
+        if (rand() < 0.3) addFresh(function () { return brandFrag(theme); }, 4);
+      } else {
+        if ((fashion || brandTheme) && rand() < 0.35) addFresh(function () { return brandFrag(theme); }, 4);
+        // CP 专属碎片同样要过「重复 / 尾巴撞车」检测（如 "…, ever" 与前面的撞车）
+        if (rand() < 0.6) addFresh(function () { return pairFrag(theme); }, 6);
+      }
+    } else if (brandTheme) {
+      // 单人 + 品牌主题（v80）：首片固定「完整姓名 + 品牌」（nameBrand 池），
+      // 一条文案就同时满足「提到人」「露出品牌」「大使身份」三件事（用户 2026-10-30 要求）。
+      if (!addPart(nameFragPick(theme, target, true, true, false, null).text)) continue;
+      // 可选：再补一片只提姓名的大使语境句（不加品牌字样，避免品牌重复太密）
+      if (rand() < 0.45) {
+        addFresh(function () { return nameFragPick(theme, target, false, false, true, null).text; });
+      }
+      // 可选：第二次品牌提及（品牌每条 1~2 次）
+      if (rand() < 0.3) addFresh(function () { return brandFrag(theme); }, 4);
+    } else {
+      // 单人主角：时尚正式主题（Dior / CK）也**必须用完整姓名**（v56），
+      // 且整条不得出现短称呼（Ling / Orm）——所以第二条不再用短称呼拼碎片，
+      // 改用无名补句 / 品牌补句加层次。
+      if (!addPart(nameFragPick(theme, target, fashion, fashion, false, null).text)) continue;
+      if (fashion) {
+        if (rand() < 0.5) addFresh(function () { return craftFrag(theme); });
+        if (rand() < 0.35) addFresh(function () { return brandFrag(theme); }, 4);
+      } else {
+        if (rand() < 0.35) {
+          addFresh(function () { return nameFragPick(theme, target, false, false, true, null).text; });
+        }
+        if (rand() < 0.25) addFresh(function () { return brandFrag(theme); }, 4);
+      }
+    }
+    // 情绪碎片补到目标长度（最多 3 条，且不与已有碎片重复，避免变成复读机）
+    let moodCount = 0;
+    while (len < lo && moodCount < 3 && parts.length < 4) { // 整条最多 4 片，避免变成清单
+      let added = false;
+      for (let t = 0; t < 10 && !added; t++) {
+        const m = moodFrag(target !== "cp", fashion);
+        if (seen.has(m) || clashes(m)) continue; // 重复/撞车 → 换一条
+        if (!addPart(m)) break;                  // 放不下 → 收尾
+        added = true;
+      }
+      if (!added) break;
+      moodCount++;
+    }
+    // 表情：句中偶尔插一个（不与句尾重复），句尾大概率带一个
+    // 时尚正式主题用克制表情池，且出现概率更低
+    let inlineEm = "";
+    if (parts.length > 1 && rand() < (fashion ? 0.2 : 0.4)) {
+      const i = Math.floor(rand() * (parts.length - 1)); // 不取最后一片，句尾单独处理
+      const em = pick(emojiPool);
+      if (em && len + em.length <= hi) { parts[i] += em; len += em.length; inlineEm = em; }
+    }
+    if (rand() < (fashion ? 0.5 : 0.8)) {
+      const em = pick(emojiPool);
+      if (em && em !== inlineEm && len + em.length <= hi) {
+        parts[parts.length - 1] += em; len += em.length;
+      }
+    }
+    let body = parts[0] || "";
+    for (let i = 1; i < parts.length; i++) body += seps[i - 1] + parts[i];
+    body = body.replace(/\s{2,}/g, " ").trim();
+    if (!body || body.length > hi) continue;
+    // 硬约束校验
+    if (onceEachCp) {
+      if (!bodyHasEachFullNameOnce(body)) continue;
+    } else if (target === "cp") {
+      if (!bodyHasBothFullNames(body)) continue;
+    } else if (fashion) {
+      // 单人 + 时尚正式主题：只用完整姓名，不残留短称呼
+      if (!bodyHasFullNameOnly(body, target)) continue;
+    }
+    // 品牌主题硬约束（v80）：整条正文必须真的露出品牌名 + 点明大使 / 合作身份，否则重来
+    if (brandTheme && (!bodyHasBrand(body, theme) || !bodyHasBrandRole(body, theme))) continue;
+    // 「ambassador」在一条里最多出现一次：首片已经常带这个词，第二片再撞就成了复读
+    if (brandTheme && (String(body).match(/ambassador/gi) || []).length > 1) continue;
+    if (/\b(that that|the the|is is|a a|and and|of of)\b/i.test(body)) continue;
+    // 拼接后出现相邻重复语块（接缝口吃）→ 换一组重来
+    if (hasAdjacentDupClause(body)) continue;
+    if (body.length >= lo) return body;
+    if (!best || body.length > best.length) best = body;
+  }
+  if (best) return best;
+  // 极端兜底（组合空间临时用尽才会走到，仍满足名字/品牌/文风约束）
+  const brand = THEME_BRAND[theme];
+  if (target === "cp") {
+    return fashion
+      ? `Lingling Kwong opens the ${brand} chapter. Orm Kornnaphat brings it to life.`
+      : "Lingling Kwong and Orm Kornnaphat in one frame, i'm not okay 💜";
+  }
+  const fb = FULL_NAMES[target] || NAMES[target] || "Ling";
+  if (fashion) return `${fb} for ${brand}: pure restraint. Nothing more was needed.`;
+  // 品牌主题的兜底也必须含品牌名 + 大使关系，否则违反上面的硬约束
+  if (brandTheme) return `${fb} is the new face of ${brand}. we're so proud 💜`;
+  return `${fb}?? i'm not okay 💜`;
+}
+function makeSentence(maxChars) {
+  // 主题锁定：CK 主题 → Ling；Dior 不锁定，沿用用户手动选择的主角
+  // （Dior 选 CP 时仍会触发下方双人全名硬约束）
+  const target = themeLockTarget() || state.target;
+  const theme = state.theme === "random" ? pick(["beauty","acting"]) : state.theme;
+  // 整条文案要求与本设备历史生成的都不重复（全站互不重复靠专属序列 + 10^14 组合空间）
+  for (let tries = 0; tries < 300; tries++) {
+    const body = buildBody(target, theme, maxChars);
+    if (!usedBodies.has(body)) {
+      usedBodies.add(body);
+      saveUsedBodies();
+      return { sentence: body, theme };
+    }
+  }
+  // 极小概率：组合空间暂时用尽，重置整条记录后重新生成
+  usedBodies.clear();
+  saveUsedBodies();
+  const body = buildBody(target, theme, maxChars);
+  usedBodies.add(body);
+  saveUsedBodies();
+  return { sentence: body, theme };
+}
+
+function generate() {
+  const out = document.getElementById("output");
+  out.innerHTML = "";
+  const kl = kwLine();
+  const tl = tagLine();
+  const tail = "\n\n" + kl + "\n" + tl;
+  // 正文最大长度 = 220 - 关键字/标签长度。
+  // ⚠️ 这是**硬上限**：旧版写成 Math.max(110, MAX_TOTAL - tail.length) 是错的 ——
+  //    当标签块超过 110 字符时（09-27 分组 tail=113）会把上限抬到 110，
+  //    整条变成 110+113=223，直接越过 220 上限。改为真正的硬上限。
+  //    正文该多长由 buildBody 自行按预算尽力填满（其内部 TARGET_CHARS=150 才是期望值）。
+  //    40 只是标签异常长时的极小兜底；测试里有「所有分组的标签块 ≤ 130」不变量守护，
+  //    保证 40 + 130 = 170 < 220 恒成立。
+  const maxChars = Math.max(40, MAX_TOTAL - tail.length);
+  const totalOf = (sentence) => sentence.length + tail.length;
+  const renderCard = (card, current, sentence, theme) => {
+    // current 是「当前显示文案对应的完整待复制文本」，复制按钮始终读它，
+    // 保证换一句之后复制的和显示的完全一致
+    current.text = sentence + tail;
+    card.querySelector(".out-text").innerHTML =
+      esc(sentence) + `\n\n<span class="kw-line">${esc(kl)}\n${esc(tl)}</span>`;
+    card.querySelector(".char-count").textContent = `共 ${totalOf(sentence)} chars`;
+    card.querySelector(".card-actions span:last-child").textContent =
+      themeLabelOf(theme);
+  };
+  for (let i = 0; i < state.count; i++) {
+    const { sentence, theme } = makeSentence(maxChars);
+    const themeLabel = themeLabelOf(theme);
+    const card = document.createElement("div");
+    card.className = "out-card";
+    const current = { text: sentence + tail };
+    card.innerHTML =
+      `<div class="out-text">${esc(sentence)}\n\n<span class="kw-line">${esc(kl)}\n${esc(tl)}</span></div>
+       <div class="card-actions">
+         <button class="mini-btn copy-btn">📋 复制整条</button>
+         <button class="mini-btn tweet-btn">🐦 一键发推</button>
+         <button class="mini-btn re-btn">🔄 换一句</button>
+         <span class="mini-btn char-count" style="cursor:default;border:none;background:none;color:#b08fc0;">共 ${totalOf(sentence)} chars</span>
+         <span class="mini-btn" style="cursor:default;border:none;background:none;">${themeLabel}</span>
+       </div>`;
+    out.appendChild(card);
+    card.querySelector(".copy-btn").addEventListener("click", function () {
+      copyText(current.text, this);
+    });
+    card.querySelector(".tweet-btn").addEventListener("click", function () {
+      openTweetIntent(current.text);
+    });
+    card.querySelector(".re-btn").addEventListener("click", function () {
+      const ns = makeSentence(maxChars);
+      renderCard(card, current, ns.sentence, ns.theme);
+    });
+  }
+}
+
+function esc(s) {
+  return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+// 兜底：点击文案区自动全选，用户可直接 Ctrl+C / 长按复制
+document.addEventListener("click", function (e) {
+  const t = e.target.closest(".out-text");
+  if (!t) return;
+  const sel = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(t);
+  sel.removeAllRanges();
+  sel.addRange(range);
+});
+
+// ---------- 复制（三层保障，兼容各类浏览器/微信内置浏览器/旧 iOS Safari） ----------
+// 复制前统一做 Unicode NFC 规范化并清理不可见字符，杜绝乱码
+function cleanText(t) {
+  try { t = t.normalize("NFC"); } catch (e) {}
+  return t.replace(/[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g, "");
+}
+
+function copyText(raw, btn) {
+  const text = cleanText(raw);
+  const done = () => {
+    if (!btn) return;
+    btn.classList.add("done");
+    btn.textContent = "✅ 已复制";
+    setTimeout(() => { btn.classList.remove("done"); btn.textContent = "📋 复制整条"; }, 1500);
+  };
+  // 第 1 层：标准剪贴板 API（Chrome / Safari / Edge / 手机浏览器）
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done).catch(() => {
+      if (!legacyCopy(text)) { alert("复制失败，请长按文案手动复制"); return; }
+      done();
+    });
+    return;
+  }
+  // 第 2/3 层：旧环境降级
+  if (legacyCopy(text)) { done(); return; }
+  alert("复制失败，请长按文案手动复制");
+}
+
+// ---------- 半自动发推：直接唤起 X 客户端（App/桌面端），全程无提示 ----------
+// 规则：点「一键发推」→ 静默复制文案（兜底）→ 尝试唤起本机 X 客户端发推框。
+//   Android：intent:// 包装官方深链（scheme=https + host=x.com +
+//            /intent/tweet?text= + package=com.twitter.android），
+//            按包名强制唤起 X App（不依赖系统"打开支持的链接"设置），
+//            App 收到的是官方深链 → 发推框预填文案有官方保证；
+//            未装 App 时自动跳转 browser_fallback_url（x.com 网页）；
+//   iOS：X 官方深链 x.com/intent/tweet?text=（Universal Link）顶层导航，
+//        直接唤起 X App 并预填文案（官方支持，无需 x.com 服务器可达）；
+//   电脑：用 twitter:// 唤起桌面客户端，未检测到客户端时不跳网页（不提示）。
+function openTweetIntent(raw) {
+  const text = cleanText(raw);
+  if (text.length > MAX_TOTAL) {
+    alert(`文案总长 ${text.length} 字符，超过 ${MAX_TOTAL} 上限，请点「换一句」重新生成后再发推。`);
+    return;
+  }
+  // ① 先静默复制一份兜底（客户端/网页任何情况都不丢文案，不弹提示）
+  copyTextQuiet(text);
+  const encoded = encodeURIComponent(text);
+  const xUrl = "https://x.com/intent/tweet?text=" + encoded;
+  const ua = navigator.userAgent || "";
+
+  // ② Android：intent:// 包装官方深链，按包名强制唤起 X App
+  // 注意：不能直接用 twitter://post?message= 这类自定义协议——X App 会
+  // 忽略 message 参数（唤起但无文案）。必须让 App 收到官方深链
+  // https://x.com/intent/tweet?text=...，预填才有官方保证。
+  if (/Android/i.test(ua)) {
+    const intentUrl = "intent://x.com/intent/tweet?text=" + encoded +
+      "#Intent;scheme=https;package=com.twitter.android;S.browser_fallback_url=" +
+      encodeURIComponent(xUrl) + ";end";
+    try {
+      window.location.href = intentUrl;
+    } catch (e) {
+      window.location.href = xUrl; // 极少数不支持 intent:// 的环境 → 直接跳 x.com
+    }
+    return;
+  }
+
+  // ③ iOS：顶层导航打开 Universal Link → 唤起 X App 并预填文案
+  // 必须用顶层导航而非 window.open 新标签页——iOS Safari 对 popup 中的
+  // Universal Link 不会自动唤起 App，只会加载网页。
+  if (/iPhone|iPad|iPod/i.test(ua)) {
+    try {
+      window.location.href = xUrl;
+    } catch (e) {
+      const a = document.createElement("a");
+      a.href = xUrl;
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    return;
+  }
+
+  // ④ 电脑：尝试唤起桌面客户端，未唤起则不自动跳网页（不提示）
+  tryOpenApp("twitter://post?message=" + encoded);
+}
+
+// iframe 尝试唤起客户端；700ms 内页面未离开（未唤起）→ 不跳网页、不提示
+function tryOpenApp(appUrl) {
+  const ifr = document.createElement("iframe");
+  ifr.style.display = "none";
+  ifr.src = appUrl;
+  document.body.appendChild(ifr);
+
+  setTimeout(function () {
+    document.body.removeChild(ifr);
+    // 未唤起（本机未安装/未识别客户端）：静默处理，文案已在剪贴板
+  }, 700);
+}
+
+// 同步复制（静默版，不改变按钮文案）：发推前的兜底复制
+function copyTextQuiet(raw) {
+  const text = cleanText(raw);
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.top = "-9999px";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) { return false; }
+}
+
+// 降级复制：先尝试 copy 事件注入（微信 X5 等 webview），再尝试增强版 textarea 方案（旧 iOS）
+function legacyCopy(text) {
+  // 方案 A：通过 copy 事件写入剪贴板数据（部分 webview 只认这种方式）
+  try {
+    const handler = (e) => {
+      e.clipboardData.setData("text/plain", text);
+      e.preventDefault();
+    };
+    document.addEventListener("copy", handler, true);
+    const okA = document.execCommand("copy");
+    document.removeEventListener("copy", handler, true);
+    if (okA) return true;
+  } catch (e) {}
+
+  // 方案 B：增强版 textarea（iOS Safari 需 contentEditable + setSelectionRange）
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.contentEditable = true;
+    ta.readOnly = false;
+    // 关键：不能 display:none / detached，否则部分浏览器复制到的是页面当前选区（乱码来源）
+    ta.style.cssText = "position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;padding:0;border:none;outline:none;box-shadow:none;background:transparent;font-size:16px;";
+    document.body.appendChild(ta);
+    const sel = document.getSelection();
+    const savedRange = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    const range = document.createRange();
+    range.selectNodeContents(ta);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    ta.setSelectionRange(0, text.length);
+    const okB = document.execCommand("copy");
+    sel.removeAllRanges();
+    if (savedRange) { try { sel.addRange(savedRange); } catch (e) {} }
+    document.body.removeChild(ta);
+    return okB;
+  } catch (e) {
+    return false;
+  }
+}
+
+// ---------- IG 文案模块（Dior IG Caption，v59 整合自独立生成器） ----------
+// 来源：另一个工作区的 dior-ig-caption-generator（单文件）。文案池与排版规则**原样照搬**，
+// 只做了必要的改名与容错：
+//   ① 全局名统一加 ig 前缀，避免与本模块撞名（原来的 generate / pick / banks / meta
+//      都会和刷推模块冲突）；
+//   ② DOM id 全部改成 ig* 前缀（原来的 genBtn / out / mode / tone 与本页元素冲突）；
+//   ③ 所有 DOM 访问都做容错（Node vm 沙盒的假 DOM 没有 .value / .style，
+//      否则回归测试会当场崩）；
+//   ④ 复制改用本页已有的 copyText()（三层降级，兼容微信内置浏览器 / 旧 iOS）。
+const IG_TAG_LIST = ["#LinglingKwong", "#OrmKornnaphat", "#Dior", "#DiorSummer27", "#PFW"];
+const IG_TAGS = IG_TAG_LIST.join(" ");
+// Story 专用标签（v62）：在帖子标签基础上追加 #LingOrmDiorSummer27。
+// 只影响 Story 输出，帖子文案的标签行（IG_TAGS）保持原样不动。
+const IG_STORY_TAG_LIST = IG_TAG_LIST.concat(["#LingOrmDiorSummer27"]);
+const IG_STORY_TAGS = IG_STORY_TAG_LIST.join(" ");
+const IG_MENTIONS = "@linglingkwong @orm.kornnaphat @dior";
+const IG_STORY_MENTIONS = "@Dior @jonathan.anderson @utzpeter @linglingkwong @orm.kornnaphat";
+const IG_EMOJI_CLOSER = ["", " ✨", " 🤍", " 💫", " 🌟"];
+const IG_LIMIT = 2200; // Instagram 文案字符上限
+
+const IG_BANKS = {
+  runway: {
+    open: [
+      "Front row energy, Dior state of mind.",
+      "Paris just turned golden — the Dior Summer 27 show took our breath away.",
+      "The runway said it all: Dior is pure poetry in motion."
+    ],
+    mid: [
+      "Lingling Kwong and Orm Kornnaphat owned the front row — every silhouette whispered elegance, every detail screamed craftsmanship.",
+      "Watching Lingling Kwong and Orm Kornnaphat glow through the Dior show: couture magic at its finest.",
+      "Lingling Kwong and Orm Kornnaphat brought crisp tailoring and luminous charm — a masterclass in modern femininity."
+    ],
+    close: [
+      "Dior women don't follow the light — they become it. ✨",
+      "Grace, courage, beauty: the Dior codes Lingling and Orm live by. 🕊️",
+      "Here's to Lingling Kwong and Orm Kornnaphat dreaming louder and shining brighter. 💫"
+    ]
+  },
+  golden: {
+    open: [
+      "Wrapped in golden-hour glow, Dior style.",
+      "Some days feel like champagne — today was one of them. 🥂",
+      "Sunlight, silk and a little Dior magic."
+    ],
+    mid: [
+      "Lingling Kwong and Orm Kornnaphat wore that kind of elegance that never begs for attention — it simply owns the room.",
+      "Lingling Kwong and Orm Kornnaphat, luminous textures and timeless lines, endless confidence.",
+      "It's not just an outfit — Lingling Kwong and Orm Kornnaphat made it an attitude stitched in gold."
+    ],
+    close: [
+      "Lingling Kwong and Orm Kornnaphat wear their glow like couture. ✨",
+      "Golden days ahead — Lingling and Orm said so. ☀️",
+      "Shine is a state of mind, and today it's fully Dior on Lingling Kwong and Orm Kornnaphat."
+    ]
+  },
+  soft: {
+    open: [
+      "Soft morning light, softer Dior lines. 🌸",
+      "A little romance, a lot of Dior.",
+      "Daydreaming in pastel and chiffon."
+    ],
+    mid: [
+      "Lingling Kwong and Orm Kornnaphat drifted through delicate florals and feather-light fabrics — spring lived in every thread.",
+      "Where softness meets strength, that's where Lingling Kwong and Orm Kornnaphat live.",
+      "Lingling Kwong and Orm Kornnaphat are femininity in its gentlest, most powerful form."
+    ],
+    close: [
+      "Lingling Kwong and Orm Kornnaphat dream softly and walk proudly. 🤍",
+      "A gentle heart deserves couture — Lingling and Orm prove it. 🕊️",
+      "Petal by petal, the Dior dream blooms around Lingling Kwong and Orm Kornnaphat."
+    ]
+  },
+  bold: {
+    open: [
+      "Power dressing? Dior wrote the rulebook.",
+      "Walking into the week like it owes me something. 💼✨",
+      "Bold shoulders, bolder vision."
+    ],
+    mid: [
+      "Lingling Kwong and Orm Kornnaphat in structured silhouettes, unshakable presence — armor for dreamers.",
+      "When Lingling Kwong and Orm Kornnaphat wear tailoring this sharp, confidence comes standard.",
+      "Dior taught Lingling Kwong and Orm Kornnaphat — and taught us: elegance and ambition are a perfect match."
+    ],
+    close: [
+      "Lingling Kwong and Orm Kornnaphat believed they could, so they wore Dior. 🔥",
+      "Lingling and Orm own the moment — the rest is details.",
+      "Fearless, flawless, forever Dior — that's Lingling Kwong and Orm Kornnaphat."
+    ]
+  }
+};
+
+// Story 标签排版：单行 / 随机分两行 / 竖排
+const IG_STORY_LAYOUTS = [
+  () => IG_STORY_TAGS,
+  () => {
+    const i = 1 + Math.floor(Math.random() * (IG_STORY_TAG_LIST.length - 1)); // 在 1~5 处断行
+    return IG_STORY_TAG_LIST.slice(0, i).join(" ") + "\n" + IG_STORY_TAG_LIST.slice(i).join(" ");
+  },
+  () => IG_STORY_TAG_LIST.join("\n")
+];
+
+// ---------- IG 评论（v61 新增用途） ----------
+// 评论 = 1~2 句时尚正向短评（首字母大写、句号收尾），主角可双人 / 单人，**一律使用完整姓名**：
+//   cp   → Lingling Kwong + Orm Kornnaphat 各出现一次，且不残留 LingOrm / 短称呼；
+//   ling → 只出现 Lingling Kwong（不出现另一位、不出现短称呼）；
+//   orm  → 只出现 Orm Kornnaphat（同上）。
+// 三个池子都是**无名**句（{A} / {B} / {N} 占位符在生成时替换），
+// 这样同一句话在单人与双人模式下都能用，也不会因为池子里写错名字而漏出短称呼。
+//
+// v65（用户要求）：**每条评论都必须出现 Dior / DiorSummer27**（品牌必须露出）。
+// 做法 = 双保险：① 在开场池 / 收尾池里补足带 Dior 的句子，让随机组合大概率自带品牌；
+//                    ② igBuildComment 里加硬约束 `commentHasBrand(body)`，不含品牌就重拼，
+//                       极端兜底句本身也带 Dior —— 所以「必含品牌」是硬保证，不是概率。
+const IG_COMMENT_OPEN = [
+  "A quiet reminder of how good Dior can look.",
+  "Saving this look to the moodboard.",
+  "The Dior Summer 27 mood, perfectly captured.",
+  "Couture storytelling at its most effortless.",
+  "Every frame of this deserves a closer look.",
+  "This is what modern elegance looks like.",
+  "The tailoring alone deserves its own essay.",
+  "Dior keeps writing the rulebook.",
+  "A masterclass in restraint and shine.",
+  "The details here are worth studying twice.",
+  "Everything about this reads timeless.",
+  "Paris delivered, and then some.",
+  "A look that will be remembered for a while.",
+  "Structure, softness and shine in one frame.",
+  "Dior at its most composed.",
+  "Another Dior chapter worth keeping.",
+  "The Dior Summer 27 palette, worn exactly right."
+];
+const IG_COMMENT_CP = [
+  "{A} and {B} wear it like a second skin.",
+  "The house could not ask for better ambassadors than {A} and {B}.",
+  "{A} and {B} brought quiet luxury to the front row.",
+  "Seen on {A} and {B}, and the collection suddenly makes perfect sense.",
+  "{A} and {B} carry the silhouette with such ease.",
+  "There is a reason {A} and {B} keep receiving these invitations.",
+  "{A} and {B} make the tailoring look weightless.",
+  "The pairing of {A} and {B} with this collection feels inevitable.",
+  "Give {A} and {B} a camera and Dior does the rest.",
+  "{A} and {B} understand exactly what the house is saying."
+];
+const IG_COMMENT_SINGLE = [
+  "{N} wears it like a second skin.",
+  "The house could not ask for a better ambassador than {N}.",
+  "{N} brought quiet luxury to the front row.",
+  "Seen on {N}, and the collection suddenly makes perfect sense.",
+  "{N} carries the silhouette with such ease.",
+  "There is a reason {N} keeps receiving these invitations.",
+  "{N} makes the tailoring look weightless.",
+  "Give {N} a camera and Dior does the rest.",
+  "{N} understands exactly what the house is saying.",
+  "{N} makes the collection feel like a personal story."
+];
+const IG_COMMENT_CLOSE = [
+  "More of this, please.",
+  "Simply beautiful.",
+  "A lasting impression.",
+  "Effortless from every angle.",
+  "Quietly unforgettable.",
+  "Worth every second of the scroll.",
+  "An easy favourite.",
+  "Beautifully done.",
+  "Framed and remembered.",
+  "This one stays with me.",
+  "Dior, unmistakably.",
+  "Pure Dior, start to finish."
+];
+
+// 评论主角归位：只认 ling / orm，其余（含 undefined、"cp"）一律双人
+function igCommentWho(target) {
+  return (target === "ling" || target === "orm") ? target : "cp";
+}
+// 把占位符换成完整姓名（双人：{A}=Lingling Kwong、{B}=Orm Kornnaphat；单人：{N}）
+function igFillNames(tpl, who) {
+  if (who === "cp") {
+    return tpl.split("{A}").join(FULL_NAMES.ling).split("{B}").join(FULL_NAMES.orm);
+  }
+  return tpl.split("{N}").join(FULL_NAMES[who]);
+}
+// 品牌露出判定（v65）：只要出现 Dior 字样即算 —— 覆盖 "Dior" / "Dior Summer 27" / "#DiorSummer27"
+// 三种写法（后两者都含 "Dior" 子串）。
+function commentHasBrand(s) {
+  return /dior/i.test(String(s || ""));
+}
+// 生成一条 IG 评论（唯一入口，不依赖 DOM，方便测试）
+// 注意（用户要求）：**评论只输出正文**，不附带标签行与 @ 行 —— 评论本身是纯文字夸奖。
+function igBuildComment(target) {
+  const who = igCommentWho(target);
+  const namePool = (who === "cp") ? IG_COMMENT_CP : IG_COMMENT_SINGLE;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const parts = [igPick(IG_COMMENT_OPEN), igFillNames(igPick(namePool), who)];
+    if (Math.random() < 0.55) parts.push(igPick(IG_COMMENT_CLOSE));
+    let body = parts.join(" ");
+    // 硬约束①：全名格式必须合规（双人各一次 / 单人只出现该主角），否则换一组重拼
+    if (who === "cp") { if (!bodyHasEachFullNameOnce(body)) continue; }
+    else if (!bodyHasFullNameOnly(body, who)) continue;
+    // 硬约束②（v65 用户要求）：必须含 Dior / DiorSummer27，否则换一组重拼
+    if (!commentHasBrand(body)) continue;
+    body += igPick(IG_EMOJI_CLOSER);
+    return body;
+  }
+  // 极端兜底（组合空间临时用尽才会走到，仍满足全名约束 + 品牌露出）
+  return (who === "cp")
+    ? FULL_NAMES.ling + " and " + FULL_NAMES.orm + ", effortlessly Dior."
+    : FULL_NAMES[who] + ", effortlessly Dior.";
+}
+
+// 原生成器用 Math.random；这里保持独立，不动刷推模块的专属随机序列
+function igPick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function igEl(id) { return document.getElementById(id); }
+function igOutValue() {
+  const el = igEl("igOut");
+  return (el && typeof el.value === "string") ? el.value : "";
+}
+function igSetOut(text) {
+  const el = igEl("igOut");
+  if (el) el.value = text;
+  igUpdateCount();
+}
+// 生成一条 IG 文案并返回文本（唯一的生成入口，不依赖 DOM，方便测试）
+function igBuildCaption(tone, mode) {
+  if (mode === "story") return igPick(IG_STORY_LAYOUTS)() + "\n" + IG_STORY_MENTIONS;
+  const keys = (!tone || tone === "any" || !IG_BANKS[tone]) ? Object.keys(IG_BANKS) : [tone];
+  const bank = IG_BANKS[igPick(keys)]; // 先随机选风格 key，再取该风格句子（勿写成数字索引）
+  return igPick(bank.open) + " " + igPick(bank.mid) + " " + igPick(bank.close) + igPick(IG_EMOJI_CLOSER) +
+         "\n\n" + IG_TAGS + "\n" + IG_MENTIONS;
+}
+function igGenerate() {
+  const modeEl = igEl("igMode");
+  const toneEl = igEl("igTone");
+  const targetEl = igEl("igTarget");
+  const mode = (modeEl && typeof modeEl.value === "string" && modeEl.value) || "caption";
+  // 评论模式走独立的短评池（主角可双人 / 单人，均用完整姓名）
+  if (mode === "comment") {
+    igSetOut(igBuildComment(targetEl && targetEl.value));
+    return;
+  }
+  igSetOut(igBuildCaption(toneEl && toneEl.value, mode));
+}
+function igOnModeChange() {
+  const modeEl = igEl("igMode");
+  const mode = (modeEl && typeof modeEl.value === "string" && modeEl.value) || "caption";
+  const story = mode === "story";
+  const comment = mode === "comment";
+  const toneEl = igEl("igTone");
+  if (toneEl) {
+    // 风格选择只对「帖子文案」有意义：Story 出标签、评论出短评，都置灰
+    toneEl.disabled = story || comment;
+    if (toneEl.style) toneEl.style.opacity = (story || comment) ? 0.4 : 1;
+  }
+  const targetEl = igEl("igTarget");
+  if (targetEl) {
+    targetEl.disabled = !comment;
+    if (targetEl.style) targetEl.style.display = comment ? "" : "none";
+  }
+  const btn = igEl("igGenBtn");
+  if (btn) btn.textContent = story ? "✨ 生成标签" : (comment ? "✨ 生成评论" : "✨ 生成文案");
+  igGenerate();
+}
+function igUpdateCount() {
+  const n = [...igOutValue()].length;
+  const el = igEl("igCount");
+  if (el) {
+    el.textContent = n + " 字符";
+    el.className = n > IG_LIMIT ? "warn" : "";
+  }
+  const lim = igEl("igLimit");
+  if (lim) lim.textContent = n > IG_LIMIT ? "超过 Instagram 上限 " + IG_LIMIT + "！" : "上限 " + IG_LIMIT;
+}
+(function initIG() {
+  const out = igEl("igOut");
+  if (out && out.addEventListener) out.addEventListener("input", igUpdateCount);
+  const copyBtn = igEl("igCopyBtn");
+  if (copyBtn && copyBtn.addEventListener) {
+    copyBtn.addEventListener("click", function () { copyText(igOutValue(), this); });
+  }
+  // 用 igOnModeChange 初始化（它会按当前用途把主角选择器的显隐、按钮文案摆正，并生成首条）
+  igOnModeChange(); // 进来先给一条，原生成器也是这么做的
+})();
+</script>
+<script>
+// ---------- Service Worker 注册 + 缓存自愈 ----------
+// ① 清掉所有「非当前版本」的残留缓存（旧版 index.html / config.js）。
+//    旧缓存一清，旧 SW 缓存未命中就会回源取到线上真值，可自动脱困。
+// ② updateViaCache:'none' 强制浏览器每次都从网络取 sw.js 真值，
+//    避免 SW 脚本自身被 HTTP 缓存钉在旧版本而永远不更新。
+(function () {
+  if (!('serviceWorker' in navigator)) return;
+  var CUR = 'lingorm-v86'; // 与 sw.js 的 CACHE 常量保持一致
+  try {
+    if ('caches' in window) {
+      caches.keys().then(function (keys) {
+        var stale = keys.filter(function (k) {
+          return /^lingorm-v\d+$/.test(k) && k !== CUR;
+        });
+        if (stale.length) {
+          return Promise.all(stale.map(function (k) { return caches.delete(k); }));
+        }
+      }).catch(function () {});
+    }
+  } catch (e) {}
+  navigator.serviceWorker.register('sw.js?v=86', { updateViaCache: 'none' }).then(function (reg) {
+    if (reg && reg.update) { try { reg.update(); } catch (e) {} }
+  }).catch(function () {});
+})();
+</script>
+<script>
+// ---------- 自动更新：页面代码更新或后台配置更新时自动刷新，其余情况绝不刷 ----------
+// 原理：双信号检测——① 对比当前页 <meta name="app-ver"> 与线上 index.html 的版本号
+//（页面代码更新时触发）；② 记录页面加载时的 config.js 文本快照并定期比对（配置更新时触发）。
+// 任一信号确认变化才 location.reload()；版本一致、配置一致、网络抖动、弱网回退一律不刷。
+(function () {
+  var meta = document.querySelector('meta[name="app-ver"]');
+  var ver = meta ? meta.getAttribute('content') : null; // 当前页面版本号
+  var confirmTimer = null;  // 二次确认定时器
+  var suppressUntil = 0;    // 刚重载后的保护期（防刷新循环）
+
+  try {
+    if (sessionStorage.getItem('lingorm_reloaded') === '1') {
+      sessionStorage.removeItem('lingorm_reloaded');
+      suppressUntil = Date.now() + 30000; // 重载后 30 秒内不再自动刷新
+    }
+  } catch (e) {}
+
+  // 线上真值通道：带 ?chk= 直连网络（Service Worker 放行，不读不写缓存）
+  function fetchNetText(url) {
+    return fetch(url + '?chk=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .catch(function () { return null; });
+  }
+  // 有效性校验：必须是真正的 config.js 文本。防止弱网/离线时 Service Worker
+  // 回退返回 index.html 的 HTML 内容，被误判成"配置变化"而触发无意义刷新。
+  function isCfgText(t) {
+    return !!t && t.indexOf('const CONFIG') !== -1 && t.indexOf('daily') !== -1;
+  }
+  // 有效性校验：必须是真正的 index.html 且带版本号标记
+  function remoteVerOf(html) {
+    if (!html || html.indexOf('<meta') === -1) return null;
+    var m = html.match(/<meta name="app-ver" content="([^"]+)"/);
+    return m ? m[1] : null;
+  }
+
+  // 版本不一致计数：连续两次确认"线上版本与当前页面不一致"说明缓存层已不可信，
+  // 直接走终极自愈（注销 SW + 清空所有缓存 + 硬重载），不再反复刷新。
+  var MISMATCH_KEY = 'lingorm_mismatch';
+  function bumpMismatch() {
+    try {
+      var n = parseInt(localStorage.getItem(MISMATCH_KEY) || '0', 10) + 1;
+      localStorage.setItem(MISMATCH_KEY, String(n));
+      return n;
+    } catch (e) { return 0; }
+  }
+  function clearMismatch() { try { localStorage.removeItem(MISMATCH_KEY); } catch (e) {} }
+
+  // 终极自愈：把设备上所有缓存层全部推倒重建
+  function hardHeal() {
+    if (hardHeal._done) return;
+    hardHeal._done = true;
+    try { sessionStorage.setItem('lingorm_reloaded', '1'); } catch (e) {}
+    var jobs = [];
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+          return Promise.all(rs.map(function (r) {
+            try { return r.unregister(); } catch (e) { return null; }
+          }));
+        }).catch(function () {}));
+      }
+    } catch (e) {}
+    try {
+      if (window.caches && caches.keys) {
+        jobs.push(caches.keys().then(function (ks) {
+          return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+        }).catch(function () {}));
+      }
+    } catch (e) {}
+    var go = function () {
+      try { location.replace('index.html?_hard=' + Date.now()); }
+      catch (e) { location.reload(); }
+    };
+    Promise.all(jobs).then(go).catch(go);
+  }
+
+  function doReload() {
+    if (Date.now() < suppressUntil) return; // 保护期内不刷新
+    if (doReload._pending) return;          // 已在过渡中，不重复触发
+    if (bumpMismatch() >= 2) { hardHeal(); return; } // 再次不一致 → 推倒重建
+    doReload._pending = true;
+    try { sessionStorage.setItem('lingorm_reloaded', '1'); } catch (e) {}
+    // 平滑过渡：先叠加与页面背景同色的遮罩淡入，盖满后再刷新。
+    // 避免"页面已显示旧内容 → 瞬间整页刷新"造成的视觉闪跳。
+    try {
+      var fade = document.createElement('div');
+      fade.style.cssText = 'position:fixed;inset:0;background:#fdf2f8;opacity:0;'
+        + 'transition:opacity .3s ease;z-index:2147483647;pointer-events:auto;';
+      document.body.appendChild(fade);
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { fade.style.opacity = '1'; });
+      });
+      setTimeout(function () {
+        // 不用 location.reload()：普通 reload 可能再次命中网关边缘缓存的旧页面。
+        // 地址固定落到 index.html（根路径 / 被网关固化缓存为旧版，绝不能回去），
+        // 并带唯一参数强制绕过边缘缓存，确保刷新后就是新版本。
+        try { location.replace('index.html?_r=' + Date.now()); }
+        catch (e) { location.reload(); }
+      }, 340);
+    } catch (e) {
+      location.reload();
+    }
+  }
+
+  // 检测：index.html 版本号变化 或 配置语义变化 → 有更新
+  function detect(callback) {
+    var verChanged = false, cfgChanged = false;
+    var steps = [];
+    if (ver !== null) {
+      steps.push(fetchNetText('index.html').then(function (t) {
+        var rv = remoteVerOf(t);
+        if (rv && rv !== ver) verChanged = true;
+      }));
+    }
+    steps.push(fetchNetText('config.js').then(function (t) {
+      if (!isCfgText(t)) return;
+      // 语义级比对（零竞态）：把线上真值文本解析成 CONFIG 对象，与页面
+      // 实际正在运行的 CONFIG 对象做 JSON 比对。不用"重新拉缓存当快照"——
+      // 那条通道会被 SWR 后台更新污染（快照变成新配置 → 永远检测不到变化）。
+      try {
+        var remoteCfg = new Function(t + '\n;return CONFIG;')();
+        if (remoteCfg && typeof JSON.stringify(remoteCfg) === 'string'
+            && JSON.stringify(remoteCfg) !== JSON.stringify(CONFIG)) cfgChanged = true;
+      } catch (err) { /* 解析失败视为无效，本轮忽略 */ }
+    }));
+    Promise.all(steps).then(function () { callback(verChanged || cfgChanged); });
+  }
+
+  function check() {
+    if (confirmTimer) return;               // 已有未决确认，等它出结果
+    if (Date.now() < suppressUntil) return; // 保护期内不检测
+    detect(function (changed) {
+      if (!changed) { clearMismatch(); return; } // 已对齐线上版本 → 复位自愈计数
+      // 有更新 → 3 秒后二次确认，仍然有更新才刷新（防单次网络抖动误判）
+      confirmTimer = setTimeout(function () {
+        confirmTimer = null;
+        detect(function (changed2) { if (changed2) doReload(); });
+      }, 3000);
+    });
+  }
+
+  check();
+  // SW 通知通道：SW 回源比对发现配置/页面变化时主动推送，立即刷新
+  // （即使页面自身检测失效也能兜底）
+  if (navigator.serviceWorker && navigator.serviceWorker.addEventListener) {
+    navigator.serviceWorker.addEventListener('message', function (e) {
+      if (e.data && e.data.type === 'APP_UPDATED') doReload();
+    });
+  }
+  // 加载后首分钟加密检测（3s/10s/30s），尽快对齐刚上线的更新
+  [3000, 10000, 30000].forEach(function (ms) { setTimeout(check, ms); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) check(); });
+  window.addEventListener('focus', check);
+  window.addEventListener('pageshow', check);
+  setInterval(check, 15000);
+
+  // 版本角标（诊断用，右下角小字，不可点击）
+  try {
+    var badge = document.createElement('div');
+    badge.textContent = 'v' + (ver || '?');
+    badge.style.cssText = 'position:fixed;right:4px;bottom:2px;font-size:9px;color:#888;opacity:.55;z-index:99;pointer-events:none;';
+    document.body.appendChild(badge);
+  } catch (e) {}
+})();
+</script>
+<script>
+// ---------- 添加到主屏幕 / 安装到桌面 ----------
+(function () {
+  // 已作为独立 App 运行（从桌面图标打开）→ 不再显示安装按钮
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) return;
+  var ua = navigator.userAgent || '';
+  // 微信/QQ 等内置浏览器无法安装 → 不显示
+  if (/MicroMessenger|QQ\s|WeiBo/i.test(ua)) return;
+
+  var isIOS = /iPhone|iPad|iPod/i.test(ua);
+  var btn = document.createElement('button');
+  btn.id = 'installBtn';
+  btn.type = 'button';
+  btn.textContent = isIOS ? '📲 添加到主屏幕' : '📲 安装到桌面';
+  // 插到副标题与日期横幅之间
+  var sub = document.querySelector('.sub');
+  if (sub) sub.parentNode.insertBefore(btn, sub.nextSibling);
+  else document.body.appendChild(btn);
+
+  var deferredPrompt = null;
+
+  // 安卓 / 桌面 Chrome 等：捕获浏览器的可安装提示
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    btn.style.display = 'block';
+  });
+
+  // 已安装完成 → 隐藏按钮
+  window.addEventListener('appinstalled', function () { btn.style.display = 'none'; });
+
+  // iOS 引导弹窗
+  function showIOSGuide() {
+    var mask = document.createElement('div');
+    mask.className = 'ios-mask';
+    mask.innerHTML =
+      '<div class="ios-card">' +
+        '<h3>📲 添加到主屏幕</h3>' +
+        '<div class="ios-step"><span class="num">1</span><span>点击 Safari 底部工具栏的分享按钮 <span class="share-ico">⬆️</span></span></div>' +
+        '<div class="ios-step"><span class="num">2</span><span>下滑菜单，选择「<b>添加到主屏幕</b>」</span></div>' +
+        '<div class="ios-step"><span class="num">3</span><span>点击右上角「<b>添加</b>」，桌面就会出现 LingOrm 图标</span></div>' +
+        '<button class="ios-close" type="button">知道了</button>' +
+      '</div>';
+    mask.addEventListener('click', function (e) { if (e.target === mask || e.target.className === 'ios-close') mask.remove(); });
+    document.body.appendChild(mask);
+  }
+
+  btn.addEventListener('click', function () {
+    if (deferredPrompt) {
+      // 安卓 / 桌面：弹出浏览器原生安装框
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function (res) {
+        if (res.outcome === 'accepted') btn.style.display = 'none';
+        deferredPrompt = null;
+      });
+    } else if (isIOS) {
+      showIOSGuide();
+    } else {
+      // 非 Chrome 系浏览器（无 beforeinstallprompt 支持）→ 隐藏按钮
+      btn.style.display = 'none';
+    }
+  });
+
+  // iOS 无 beforeinstallprompt 事件，始终显示引导按钮
+  if (isIOS) btn.style.display = 'block';
+})();
+</script>
+</body>
+</html>
