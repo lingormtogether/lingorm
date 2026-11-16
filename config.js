@@ -635,6 +635,27 @@ const CONFIG = {
           ]
         }
       ]
+    },
+    "11-17": {
+      groups: [
+        {
+          name: "LINGORM CALENDAR SIGN EVENT",
+          start: "2026-11-17 16:20",
+          end:   "2026-11-18 16:30",
+          keywords: ["LINGORM CALENDAR SIGN EVENT"],
+          // 标签按后台提供的格式分行（两行）：泰文活动标签（3台2570年台历签售会）/ 泰文名 + CP 标签
+          // 没有全名标签（无 #LinglingKwong / #OrmKornnaphat），但关键字含 LINGORM、
+          //   第二行也有 #LingOrm → 主角默认 CP（双人），文案里两人全名都要有
+          // 无品牌标签（无 Dior / CK）→ 品牌推不出主题，靠下面的 theme 字段指定
+          // theme: 与其它无品牌活动组（10-17 / 11-02 / 11-14 / 11-15）一致，默认「随机混搭」
+          //        （若想固定美妆 / 固定演技，把下面这行改成 theme: "beauty" / "acting"）
+          theme: "random",
+          tags: [
+            ["#หลิงออมปฏิทินช่อง3ปี2570"],
+            ["#หลิงออม", "#LingOrm"]
+          ]
+        }
+      ]
     }
   }
 };
