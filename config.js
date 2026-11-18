@@ -656,6 +656,27 @@ const CONFIG = {
           ]
         }
       ]
+    },
+    "11-18": {
+      groups: [
+        {
+          name: "THETOUCH WITH LINGORM 2026",
+          start: "2026-11-18 14:30",
+          end:   "2026-11-19 14:45",
+          keywords: ["THETOUCH WITH LINGORM 2026"],
+          // 标签按后台提供的格式分行（两行）：活动标签（LO The Moment 第二章）/ 泰文名 + CP 标签
+          // 没有全名标签（无 #LinglingKwong / #OrmKornnaphat），但关键字含 LINGORM、
+          //   第二行也有 #LingOrm → 主角默认 CP（双人），文案里两人全名都要有
+          // 无品牌标签（无 Dior / CK）→ 品牌推不出主题，靠下面的 theme 字段指定
+          // theme: 与其它无品牌活动组（11-02 / 11-14 / 11-15 / 11-17）一致，默认「随机混搭」
+          //        （若想固定美妆 / 固定演技，把下面这行改成 theme: "beauty" / "acting"）
+          theme: "random",
+          tags: [
+            ["#LOTheMomentChapter2"],
+            ["#หลิงออม", "#LingOrm"]
+          ]
+        }
+      ]
     }
   }
 };
