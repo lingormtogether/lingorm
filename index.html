@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="LingOrm刷推">
-<meta name="app-ver" content="88">
+<meta name="app-ver" content="89">
 <script>
 // ---------- 入口纠偏（必须放 <head>，在首次绘制前执行）----------
 // 平台网关把根路径 / 固化缓存成旧版本（v45，主题里是 Calvin Klein SS27），
@@ -560,7 +560,7 @@
      平台静态服务不返回 Cache-Control，浏览器会按启发式缓存把它长期钉在旧副本，
      于是「后台改了配置、线上也推成功了，但访客设备上看不到新分组」。
      带上 ?v=<app-ver> 后每次升版都是一个全新 URL，一定回源取到最新配置。 -->
-<script src="config.js?v=88"></script>
+<script src="config.js?v=89"></script>
 <script>
 const state = { target: "cp", theme: "random", count: 3, mode: "lingorm", prevTheme: null, platform: "x" };
 
@@ -2215,7 +2215,7 @@ function igUpdateCount() {
 //    避免 SW 脚本自身被 HTTP 缓存钉在旧版本而永远不更新。
 (function () {
   if (!('serviceWorker' in navigator)) return;
-  var CUR = 'lingorm-v88'; // 与 sw.js 的 CACHE 常量保持一致
+  var CUR = 'lingorm-v89'; // 与 sw.js 的 CACHE 常量保持一致
   try {
     if ('caches' in window) {
       caches.keys().then(function (keys) {
@@ -2228,7 +2228,7 @@ function igUpdateCount() {
       }).catch(function () {});
     }
   } catch (e) {}
-  navigator.serviceWorker.register('sw.js?v=88', { updateViaCache: 'none' }).then(function (reg) {
+  navigator.serviceWorker.register('sw.js?v=89', { updateViaCache: 'none' }).then(function (reg) {
     if (reg && reg.update) { try { reg.update(); } catch (e) {} }
   }).catch(function () {});
 })();
