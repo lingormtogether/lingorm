@@ -15,7 +15,7 @@
 // v50：不再把根路径 './' 放进预缓存。
 // 平台网关把根路径 / 固化缓存为旧版本（v45），预缓存它会污染缓存；
 // 入口统一走 /index.html，根路径导航时的缓存兜底也回退到 /index.html。
-const CACHE = 'lingorm-v91';
+const CACHE = 'lingorm-v92';
 const CORE = ['./index.html', './config.js', './manifest.json', './icon-192.png', './icon-512.png'];
 
 // 网络优先的超时阈值：超过则回退缓存，避免弱网下长时间白屏
