@@ -738,6 +738,26 @@ const CONFIG = {
           ]
         }
       ]
+    },
+    "11-25": {
+      groups: [
+        {
+          name: "ORM BVLGARI HANOI OPENING",
+          start: "2026-11-25 17:30",
+          end:   "2026-11-26 17:45",
+          keywords: ["ORM BVLGARI HANOI OPENING"],
+          // 标签按后台提供的格式分行（两行）：活动标签（宝格丽河内新店开业）/ 泰文名 + 全名标签
+          // 只有一个全名标签 #OrmKornnaphat → 主角默认 = Orm（单人），文案里不得出现 Ling
+          // 无品牌标签（Bvlgari 不在 THEME_BY_BRAND，只有 Dior）→ 品牌推不出主题，靠下面的 theme 字段指定
+          // theme: 与其它无品牌活动组（11-14 / 11-15 / 11-17 / 11-18 / 11-19 / 11-21 / 11-22）一致，默认「随机混搭」
+          //        （与 11-19 宝格丽 Siam Paragon 组同款；若想固定美妆 / 固定演技，把下面这行改成 theme: "beauty" / "acting"）
+          theme: "random",
+          tags: [
+            ["#OrmAtBvlgariVN"],
+            ["#ออมกรณ์นภัส", "#OrmKornnaphat"]
+          ]
+        }
+      ]
     }
   }
 };
